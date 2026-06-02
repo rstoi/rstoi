@@ -12,6 +12,9 @@ async function main(): Promise<void> {
   if (config.adapter === "cloud-api") {
     const { CloudApiClient } = await import("./adapters/cloud-api/index.js");
     adapter = new CloudApiClient();
+  } else if (config.adapter === "twilio") {
+    const { TwilioClient } = await import("./adapters/twilio/index.js");
+    adapter = new TwilioClient();
   } else {
     const { BaileysClient } = await import("./adapters/baileys/index.js");
     adapter = new BaileysClient();

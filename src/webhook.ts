@@ -16,6 +16,8 @@ export function createWebhookServer(adapter: WhatsAppAdapter): express.Express {
       },
     }),
   );
+  // Twilio sends form-encoded payloads
+  app.use(express.urlencoded({ extended: false }));
 
   // Webhook verification (GET) — Meta sends this once to verify the endpoint
   app.get("/webhook", (req, res) => {
