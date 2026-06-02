@@ -224,16 +224,21 @@ export class CloudApiClient extends WhatsAppAdapter {
   }
 
   async getBusinessProfile(): Promise<BusinessProfile> {
-    const res = await this.http.get(`/${this.phoneNumberId}/whatsapp_business_profile`, {
-      params: { fields: "about,address,description,email,profile_picture_url,websites,vertical" },
-    });
+    const [profileRes, phoneRes] = await Promise.all([
+      this.http.get(`/${this.phoneNumberId}/whatsapp_business_profile`, {
+        params: { fields: "about,address,description,email,profile_picture_url,websites,vertical" },
+      }),
+      this.http.get(`/${this.phoneNumberId}`),
+    ]);
+    // Meta API wraps business profile in a data array; phone info is top-level
+    const profile = (profileRes.data.data as Record<string, unknown>[])?.[0] ?? profileRes.data as Record<string, unknown>;
     return {
       id: this.phoneNumberId,
-      name: (res.data.name as string | undefined) ?? "",
-      phone: (res.data.display_phone_number as string | undefined) ?? "",
-      about: res.data.about as string | undefined,
-      email: res.data.email as string | undefined,
-      address: res.data.address as string | undefined,
+      name: (phoneRes.data.verified_name as string | undefined) ?? "",
+      phone: (phoneRes.data.display_phone_number as string | undefined) ?? "",
+      about: profile["about"] as string | undefined,
+      email: profile["email"] as string | undefined,
+      address: profile["address"] as string | undefined,
     };
   }
 
