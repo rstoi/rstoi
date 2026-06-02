@@ -27,8 +27,9 @@ export class CloudApiClient extends WhatsAppAdapter {
     this.phoneNumberId = process.env.WA_PHONE_NUMBER_ID ?? "";
     this.businessAccountId = process.env.WA_BUSINESS_ACCOUNT_ID ?? "";
     const accessToken = process.env.WA_ACCESS_TOKEN ?? "";
+    const baseURL = process.env.WA_API_BASE_URL ?? "https://graph.facebook.com/v21.0";
     this.http = axios.create({
-      baseURL: "https://graph.facebook.com/v21.0",
+      baseURL,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
