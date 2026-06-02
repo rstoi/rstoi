@@ -1,3 +1,4 @@
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WhatsAppAdapter } from "../adapters/base.js";
 
@@ -20,17 +21,16 @@ export function registerConversationResources(server: McpServer, adapter: WhatsA
 
   server.resource(
     "conversation",
-    "whatsapp://conversation/{chatId}",
+    new ResourceTemplate("whatsapp://conversation/{chatId}", { list: undefined }),
     { description: "Messages in a specific conversation", mimeType: "application/json" },
-    async (uri) => {
-      const parts = uri.href.split("/");
-      const chatId = decodeURIComponent(parts[parts.length - 1]!);
-      const messages = await adapter.getMessages(chatId, { limit: 100 });
+    async (uri, { chatId }) => {
+      const id = decodeURIComponent(chatId as string);
+      const messages = await adapter.getMessages(id, { limit: 100 });
       return {
         contents: [{
           uri: uri.href,
           mimeType: "application/json",
-          text: JSON.stringify({ chatId, messages }),
+          text: JSON.stringify({ chatId: id, messages }),
         }],
       };
     },

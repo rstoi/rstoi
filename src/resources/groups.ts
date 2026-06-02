@@ -1,3 +1,4 @@
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WhatsAppAdapter } from "../adapters/base.js";
 
@@ -20,12 +21,11 @@ export function registerGroupResources(server: McpServer, adapter: WhatsAppAdapt
 
   server.resource(
     "group",
-    "whatsapp://group/{groupId}",
+    new ResourceTemplate("whatsapp://group/{groupId}", { list: undefined }),
     { description: "Details and member list of a specific group", mimeType: "application/json" },
-    async (uri) => {
-      const parts = uri.href.split("/");
-      const groupId = decodeURIComponent(parts[parts.length - 1]!);
-      const group = await adapter.getGroup(groupId);
+    async (uri, { groupId }) => {
+      const id = decodeURIComponent(groupId as string);
+      const group = await adapter.getGroup(id);
       return {
         contents: [{
           uri: uri.href,

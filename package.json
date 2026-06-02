@@ -13,6 +13,7 @@
     "start": "node dist/index.js",
     "auth": "tsx src/auth.ts",
     "test": "vitest run",
+    "test:visual": "tsx tests/integration/visual-test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

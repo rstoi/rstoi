@@ -1,3 +1,4 @@
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WhatsAppAdapter } from "../adapters/base.js";
 
@@ -20,12 +21,11 @@ export function registerContactResources(server: McpServer, adapter: WhatsAppAda
 
   server.resource(
     "contact",
-    "whatsapp://contact/{contactId}",
+    new ResourceTemplate("whatsapp://contact/{contactId}", { list: undefined }),
     { description: "Details of a specific contact", mimeType: "application/json" },
-    async (uri) => {
-      const parts = uri.href.split("/");
-      const contactId = decodeURIComponent(parts[parts.length - 1]!);
-      const contact = await adapter.getContact(contactId);
+    async (uri, { contactId }) => {
+      const id = decodeURIComponent(contactId as string);
+      const contact = await adapter.getContact(id);
       return {
         contents: [{
           uri: uri.href,
