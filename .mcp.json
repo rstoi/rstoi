@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "whatsapp-business": {
-      "command": "node",
-      "args": ["--import", "tsx/esm", "src/index.ts"],
+      "command": "node_modules/.bin/tsx",
+      "args": ["src/index.ts"],
       "cwd": "/home/user/rstoi",
       "env": {
         "WA_ADAPTER": "cloud-api",
@@ -17,12 +17,11 @@
       }
     },
     "computer-use": {
-      "command": "bash",
-      "args": ["src/computer-use/start.sh"],
+      "command": "node_modules/.bin/tsx",
+      "args": ["src/computer-use/server.ts"],
       "cwd": "/home/user/rstoi",
       "env": {
-        "DISPLAY": ":99",
-        "DISPLAY_NUM": "99"
+        "DISPLAY": ":99"
       }
     }
   }
