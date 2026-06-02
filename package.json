@@ -14,6 +14,7 @@
     "auth": "tsx src/auth.ts",
     "setup": "tsx src/setup.ts",
     "mock": "tsx src/meta-mock.ts",
+    "computer-use": "bash src/computer-use/start.sh",
     "test": "vitest run",
     "test:visual": "tsx tests/integration/visual-test.ts",
     "typecheck": "tsc --noEmit"

@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "whatsapp-business": {
+      "command": "node",
+      "args": ["--import", "tsx/esm", "src/index.ts"],
+      "cwd": "/home/user/rstoi",
+      "env": {
+        "WA_ADAPTER": "cloud-api",
+        "WA_API_BASE_URL": "http://localhost:4000",
+        "WA_PHONE_NUMBER_ID": "mock-phone-id",
+        "WA_ACCESS_TOKEN": "mock-token",
+        "WA_BUSINESS_ACCOUNT_ID": "mock-biz-id",
+        "WA_WEBHOOK_VERIFY_TOKEN": "whatsapp-mcp-verify-2026",
+        "WEBHOOK_PORT": "3000",
+        "SQLITE_DB_PATH": "./data/whatsapp.db",
+        "MCP_TRANSPORT": "stdio"
+      }
+    },
+    "computer-use": {
+      "command": "bash",
+      "args": ["src/computer-use/start.sh"],
+      "cwd": "/home/user/rstoi",
+      "env": {
+        "DISPLAY": ":99",
+        "DISPLAY_NUM": "99"
+      }
+    }
+  }
+}
