@@ -12,6 +12,7 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "auth": "tsx src/auth.ts",
+    "setup": "tsx src/setup.ts",
     "test": "vitest run",
     "test:visual": "tsx tests/integration/visual-test.ts",
     "typecheck": "tsc --noEmit"
@@ -28,6 +29,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "@types/better-sqlite3": "^7.6.8",
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
