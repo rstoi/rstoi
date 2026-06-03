@@ -1,11 +1,13 @@
 {
   "mcpServers": {
     "computer-use": {
-      "command": "node_modules/.bin/tsx",
+      "command": "/home/user/rstoi/node_modules/.bin/tsx",
       "args": ["src/computer-use/server.ts"],
       "cwd": "/home/user/rstoi",
       "env": {
-        "DISPLAY": ":99"
+        "DISPLAY": ":99",
+        "PATH": "/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "HOME": "/root"
       }
     }
   }
