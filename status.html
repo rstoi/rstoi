@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Code — Painel de Status</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --green: #3fb950;
+      --green-dim: #1a3a24;
+      --red: #f85149;
+      --red-dim: #3d1a19;
+      --yellow: #d29922;
+      --yellow-dim: #3a2d0a;
+      --blue: #58a6ff;
+      --blue-dim: #0d2149;
+      --purple: #bc8cff;
+      --purple-dim: #2a1a3d;
+      --orange: #ffa657;
+      --accent: #1f6feb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #1f6feb 0%, #bc8cff 100%);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
+    header .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .ts { margin-left: auto; text-align: right; color: var(--muted); font-size: 11px; }
+    .ts strong { color: var(--blue); font-size: 12px; display: block; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card.wide { grid-column: 1 / -1; }
+    .card-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .card-header .icon { font-size: 15px; }
+    .card-body { padding: 14px 16px; }
+
+    .row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .row:last-child { border-bottom: none; }
+    .row .label { color: var(--muted); }
+    .row .val { font-weight: 500; text-align: right; max-width: 60%; word-break: break-all; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+    }
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+    .ok  { background: var(--green-dim); color: var(--green); }
+    .ok::before { background: var(--green); }
+    .err { background: var(--red-dim); color: var(--red); }
+    .err::before { background: var(--red); }
+    .warn { background: var(--yellow-dim); color: var(--yellow); }
+    .warn::before { background: var(--yellow); }
+    .info { background: var(--blue-dim); color: var(--blue); }
+    .info::before { background: var(--blue); }
+    .mock { background: var(--purple-dim); color: var(--purple); }
+    .mock::before { background: var(--purple); }
+
+    /* progress bar */
+    .bar-wrap { background: var(--surface2); border-radius: 4px; height: 6px; flex: 1; margin: 0 12px; }
+    .bar { height: 100%; border-radius: 4px; }
+    .bar.green { background: var(--green); }
+    .bar.yellow { background: var(--yellow); }
+    .bar.red { background: var(--red); }
+
+    /* commit list */
+    .commit { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .commit:last-child { border-bottom: none; }
+    .sha { color: var(--blue); font-size: 11px; flex-shrink: 0; font-family: monospace; }
+    .msg { color: var(--text); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* network grid */
+    .net-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .net-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .net-item .host { font-size: 11px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* tool list */
+    .tool-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tool-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: var(--text);
+    }
+    .tool-chip.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+
+    /* stat cards */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat .num { font-size: 26px; font-weight: 700; color: var(--blue); line-height: 1.1; }
+    .stat .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+    /* mem/disk rows */
+    .res-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .res-row:last-child { border-bottom: none; }
+    .res-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
+    .res-top .name { font-weight: 500; }
+    .res-top .nums { color: var(--muted); font-size: 11px; }
+
+    /* adapter list */
+    .adapter { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+    .adapter:last-child { border-bottom: none; }
+    .adapter .aname { font-weight: 500; flex: 1; }
+    .adapter .adesc { font-size: 11px; color: var(--muted); }
+
+    footer {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    footer a { color: var(--blue); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚡</div>
+  <div>
+    <h1>Claude Code — Painel de Status</h1>
+    <div class="subtitle">rstoi/rstoi &nbsp;·&nbsp; branch: claude/whatsapp-business-mcp-HbgRU</div>
+  </div>
+  <div class="ts">
+    <strong>2026-06-04</strong>
+    Gerado em tempo real
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- ── SISTEMA ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🖥</span> Sistema</div>
+    <div class="card-body">
+      <div class="row"><span class="label">OS</span><span class="val">Ubuntu 24.04.4 LTS</span></div>
+      <div class="row"><span class="label">Kernel</span><span class="val">6.18.5 x86_64</span></div>
+      <div class="row"><span class="label">CPU</span><span class="val">Intel Xeon 2.80GHz · 4 vCPUs</span></div>
+      <div class="row"><span class="label">Tipo</span><span class="val">Container remoto (cloud)</span></div>
+      <div class="row"><span class="label">Sessão</span><span class="val"><span class="badge ok">Ativa</span></span></div>
+
+      <div class="res-row" style="margin-top:12px">
+        <div class="res-top"><span class="name">RAM</span><span class="nums">504 Mi usados de 15 Gi</span></div>
+        <div style="display:flex;align-items:center">
+          <div class="bar-wrap"><div class="bar green" style="width:3.3%"></div></div>
+          <span style="color:var(--green);font-size:11px">3%</span>
+        </div>
+      </div>
+      <div class="res-row">
+        <div class="res-top"><span class="name">Disco (/)</span><span class="nums">8 Gi usados de 252 Gi</span></div>
+        <div style="display:flex;align-items:center">
+          <div class="bar-wrap"><div class="bar green" style="width:22%"></div></div>
+          <span style="color:var(--green);font-size:11px">22%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RUNTIMES ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">⚙️</span> Runtimes &amp; Ferramentas</div>
+    <div class="card-body">
+      <div class="row"><span class="label">Node.js</span><span class="val"><span class="badge ok">v22.22.2</span></span></div>
+      <div class="row"><span class="label">npm</span><span class="val">10.9.7</span></div>
+      <div class="row"><span class="label">tsx</span><span class="val"><span class="badge ok">v4.22.4</span></span></div>
+      <div class="row"><span class="label">Python</span><span class="val">3.11.15</span></div>
+      <div class="row"><span class="label">Git</span><span class="val">2.43.0</span></div>
+      <div class="row"><span class="label">curl</span><span class="val">8.5.0 (OpenSSL/3.0.13)</span></div>
+      <div class="row"><span class="label">Chromium</span><span class="val">141.0.7390.37 (Playwright)</span></div>
+      <div class="row"><span class="label">xdotool</span><span class="val">3.20160805.1</span></div>
+      <div class="row"><span class="label">scrot</span><span class="val">1.10</span></div>
+    </div>
+  </div>
+
+  <!-- ── DISPLAY VIRTUAL ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🖼</span> Display Virtual (Computer Use)</div>
+    <div class="card-body">
+      <div class="row"><span class="label">Xvfb</span><span class="val"><span class="badge ok">Rodando (:99)</span></span></div>
+      <div class="row"><span class="label">Resolução</span><span class="val">1366 × 768 × 24bpp</span></div>
+      <div class="row"><span class="label">DISPLAY</span><span class="val">:99</span></div>
+      <div class="row"><span class="label">Chromium path</span><span class="val">/opt/pw-browsers/chromium-1194/chrome-linux/chrome</span></div>
+      <div class="row"><span class="label">PID Xvfb</span><span class="val">7098</span></div>
+      <div class="row" style="margin-top:8px"><span class="label">Nota</span><span class="val" style="color:var(--yellow);font-size:11px">Reiniciar após cada boot do container</span></div>
+    </div>
+  </div>
+
+  <!-- ── MCP SERVERS ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🔌</span> MCP Servers</div>
+    <div class="card-body">
+      <div class="adapter">
+        <div>
+          <div class="aname">computer-use</div>
+          <div class="adesc">16 ferramentas · screenshot, mouse, teclado, shell, janelas</div>
+        </div>
+        <span class="badge ok">Ativo</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">whatsapp-business</div>
+          <div class="adesc">Removido por solicitação do usuário</div>
+        </div>
+        <span class="badge err">Removido</span>
+      </div>
+      <div style="margin-top:12px">
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Ferramentas computer-use disponíveis:</div>
+        <div class="tool-list">
+          <span class="tool-chip active">screenshot</span>
+          <span class="tool-chip active">get_screen_size</span>
+          <span class="tool-chip active">mouse_move</span>
+          <span class="tool-chip active">left_click</span>
+          <span class="tool-chip active">right_click</span>
+          <span class="tool-chip active">double_click</span>
+          <span class="tool-chip active">middle_click</span>
+          <span class="tool-chip active">scroll</span>
+          <span class="tool-chip active">drag_and_drop</span>
+          <span class="tool-chip active">get_mouse_position</span>
+          <span class="tool-chip active">type</span>
+          <span class="tool-chip active">key</span>
+          <span class="tool-chip active">get_active_window</span>
+          <span class="tool-chip active">focus_window</span>
+          <span class="tool-chip active">open_application</span>
+          <span class="tool-chip active">run_command</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── WHATSAPP MCP ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">💬</span> WhatsApp MCP — Adaptadores</div>
+    <div class="card-body">
+      <div class="adapter">
+        <div>
+          <div class="aname">cloud-api <span style="font-weight:400;color:var(--muted)">(Meta)</span></div>
+          <div class="adesc">WA_API_BASE_URL=localhost:4000 · simulador local ativo</div>
+        </div>
+        <span class="badge mock">Mock</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">twilio <span style="font-weight:400;color:var(--muted)">(WhatsApp Sandbox)</span></div>
+          <div class="adesc">Aguardando TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN</div>
+        </div>
+        <span class="badge warn">Sem credenciais</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">baileys <span style="font-weight:400;color:var(--muted)">(WhatsApp Web)</span></div>
+          <div class="adesc">Requer QR code scan · somente uso local</div>
+        </div>
+        <span class="badge warn">Local only</span>
+      </div>
+      <div style="margin-top:12px">
+        <div class="row"><span class="label">Adaptador ativo</span><span class="val"><span class="badge mock">cloud-api (mock)</span></span></div>
+        <div class="row"><span class="label">Transport MCP</span><span class="val">stdio</span></div>
+        <div class="row"><span class="label">Webhook port</span><span class="val">3000</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BANCO DE DADOS ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🗄</span> Banco de Dados (SQLite)</div>
+    <div class="card-body">
+      <div class="stats" style="margin-bottom:14px">
+        <div class="stat"><div class="num">16</div><div class="lbl">Mensagens</div></div>
+        <div class="stat"><div class="num">3</div><div class="lbl">Contatos</div></div>
+        <div class="stat"><div class="num">56K</div><div class="lbl">Tamanho</div></div>
+      </div>
+      <div class="row"><span class="label">Arquivo</span><span class="val">./data/whatsapp.db</span></div>
+      <div class="row"><span class="label">Modo</span><span class="val">WAL + FTS5</span></div>
+      <div class="row"><span class="label">Tabelas</span><span class="val">messages, contacts, groups</span></div>
+      <div class="row"><span class="label">Status</span><span class="val"><span class="badge ok">Online</span></span></div>
+    </div>
+  </div>
+
+  <!-- ── TESTES ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">✅</span> Testes Automatizados</div>
+    <div class="card-body">
+      <div class="stats" style="margin-bottom:14px">
+        <div class="stat"><div class="num" style="color:var(--green)">19</div><div class="lbl">Passando</div></div>
+        <div class="stat"><div class="num" style="color:var(--red)">0</div><div class="lbl">Falhando</div></div>
+        <div class="stat"><div class="num" style="color:var(--muted)">19</div><div class="lbl">Total</div></div>
+      </div>
+      <div class="row"><span class="label">tests/store/db.test.ts</span><span class="val"><span class="badge ok">6/6 ok</span></span></div>
+      <div class="row"><span class="label">tests/tools/messaging</span><span class="val"><span class="badge ok">6/6 ok</span></span></div>
+      <div class="row"><span class="label">tests/tools/contacts</span><span class="val"><span class="badge ok">3/3 ok</span></span></div>
+      <div class="row"><span class="label">tests/tools/profile</span><span class="val"><span class="badge ok">4/4 ok</span></span></div>
+      <div class="row"><span class="label">Última execução</span><span class="val">2026-06-04</span></div>
+    </div>
+  </div>
+
+  <!-- ── GIT ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🌿</span> Git</div>
+    <div class="card-body">
+      <div class="row"><span class="label">Branch</span><span class="val" style="color:var(--green)">claude/whatsapp-business-mcp-HbgRU</span></div>
+      <div class="row"><span class="label">Status</span><span class="val"><span class="badge ok">Clean · up to date</span></span></div>
+      <div class="row"><span class="label">Remote</span><span class="val">origin (proxy local)</span></div>
+      <div style="margin-top:12px">
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Últimos commits</div>
+        <div class="commit"><span class="sha">c2ef808</span><span class="msg">fix: computer-use MCP — absolute path + full PATH env</span></div>
+        <div class="commit"><span class="sha">59faebf</span><span class="msg">chore: disable whatsapp-business MCP server</span></div>
+        <div class="commit"><span class="sha">228b77c</span><span class="msg">feat: add Twilio WhatsApp adapter</span></div>
+        <div class="commit"><span class="sha">0981fe0</span><span class="msg">fix: getBusinessProfile extracts data[0] from Meta API</span></div>
+        <div class="commit"><span class="sha">00daded</span><span class="msg">fix: enable MCP servers + resilient webhook startup</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REDE ── -->
+  <div class="card wide">
+    <div class="card-header"><span class="icon">🌐</span> Conectividade de Rede</div>
+    <div class="card-body">
+      <div style="color:var(--muted);font-size:11px;margin-bottom:12px">
+        Container usa proxy de saída com allowlist restrita. Apenas <strong style="color:var(--green)">github.com</strong> é alcançável externamente.
+      </div>
+      <div class="net-grid">
+        <div class="net-item">
+          <span class="host">github.com</span>
+          <span class="badge ok">200 OK</span>
+        </div>
+        <div class="net-item">
+          <span class="host">google.com</span>
+          <span class="badge err">403 Bloqueado</span>
+        </div>
+        <div class="net-item">
+          <span class="host">api.twilio.com</span>
+          <span class="badge err">403 Bloqueado</span>
+        </div>
+        <div class="net-item">
+          <span class="host">graph.facebook.com</span>
+          <span class="badge err">403 Bloqueado</span>
+        </div>
+        <div class="net-item">
+          <span class="host">stpantecipa.lovable.app</span>
+          <span class="badge err">403 Bloqueado</span>
+        </div>
+        <div class="net-item">
+          <span class="host">localhost:4000 (mock)</span>
+          <span class="badge ok">Disponível</span>
+        </div>
+        <div class="net-item">
+          <span class="host">localhost:3000 (webhook)</span>
+          <span class="badge ok">Disponível</span>
+        </div>
+        <div class="net-item">
+          <span class="host">proxy git (127.0.0.1:43961)</span>
+          <span class="badge ok">Ativo</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding:10px 12px;background:var(--yellow-dim);border:1px solid var(--yellow);border-radius:8px;font-size:11px;color:var(--yellow)">
+        <strong>Restrição:</strong> Para acessar sites externos (Twilio, Meta, stpantecipa), execute Claude Code localmente:
+        <code style="color:var(--text)">npm install -g @anthropic-ai/claude-code</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CLAUDE CONFIG ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">🤖</span> Claude Code Config</div>
+    <div class="card-body">
+      <div class="row"><span class="label">Conta</span><span class="val">renato.toi@setup.com.br</span></div>
+      <div class="row"><span class="label">Modelo</span><span class="val">claude-sonnet-4-6</span></div>
+      <div class="row"><span class="label">Trust dialog</span><span class="val"><span class="badge ok">Aceito</span></span></div>
+      <div class="row"><span class="label">MCP habilitados</span><span class="val">computer-use</span></div>
+      <div class="row"><span class="label">MCP desabilitados</span><span class="val" style="color:var(--muted)">nenhum</span></div>
+      <div class="row"><span class="label">Config global</span><span class="val">/root/.claude.json</span></div>
+      <div class="row"><span class="label">MCP project</span><span class="val">/home/user/rstoi/.mcp.json</span></div>
+    </div>
+  </div>
+
+  <!-- ── PROJETO ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">📦</span> Projeto — WhatsApp Business MCP</div>
+    <div class="card-body">
+      <div class="row"><span class="label">Diretório</span><span class="val">/home/user/rstoi</span></div>
+      <div class="row"><span class="label">Tipo</span><span class="val">ESM (Node 22 + TypeScript)</span></div>
+      <div class="row"><span class="label">MCP SDK</span><span class="val">@modelcontextprotocol/sdk v1.12</span></div>
+      <div class="row"><span class="label">Framework</span><span class="val">Express + SQLite (better-sqlite3)</span></div>
+      <div style="margin-top:12px">
+        <div style="color:var(--muted);font-size:11px;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">Módulos src/</div>
+        <div class="tool-list">
+          <span class="tool-chip active">adapters/cloud-api</span>
+          <span class="tool-chip active">adapters/twilio</span>
+          <span class="tool-chip active">adapters/baileys</span>
+          <span class="tool-chip active">computer-use</span>
+          <span class="tool-chip active">tools</span>
+          <span class="tool-chip active">resources</span>
+          <span class="tool-chip active">prompts</span>
+          <span class="tool-chip active">store</span>
+          <span class="tool-chip active">webhook</span>
+          <span class="tool-chip active">server</span>
+          <span class="tool-chip active">config</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PENDÊNCIAS ── -->
+  <div class="card">
+    <div class="card-header"><span class="icon">📋</span> Pendências &amp; Próximos Passos</div>
+    <div class="card-body">
+      <div class="adapter">
+        <div>
+          <div class="aname">Credenciais WhatsApp reais</div>
+          <div class="adesc">Twilio (sandbox grátis) ou Meta Cloud API</div>
+        </div>
+        <span class="badge warn">Aguardando</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">Acesso stpantecipa.lovable.app</div>
+          <div class="adesc">Bloqueado pelo proxy do container</div>
+        </div>
+        <span class="badge err">Bloqueado</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">Xvfb auto-start</div>
+          <div class="adesc">Deve ser reiniciado manualmente após cada boot</div>
+        </div>
+        <span class="badge warn">Manual</span>
+      </div>
+      <div class="adapter">
+        <div>
+          <div class="aname">Claude Code local (VM/Linux)</div>
+          <div class="adesc">Resolve todas as restrições de rede</div>
+        </div>
+        <span class="badge info">Recomendado</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>Claude Code · rstoi/rstoi · branch <strong>claude/whatsapp-business-mcp-HbgRU</strong></span>
+  <span>Gerado em 2026-06-04 · <a href="https://github.com/rstoi/rstoi">github.com/rstoi/rstoi</a></span>
+</footer>
+
+</body>
+</html>
