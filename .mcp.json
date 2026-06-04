@@ -9,6 +9,23 @@
         "PATH": "/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/root"
       }
+    },
+    "whatsapp-business": {
+      "command": "/home/user/rstoi/node_modules/.bin/tsx",
+      "args": ["src/index.ts"],
+      "cwd": "/home/user/rstoi",
+      "env": {
+        "PATH": "/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "HOME": "/root",
+        "WA_ADAPTER": "http",
+        "WA_HTTP_PHONE": "5511999990000",
+        "WA_HTTP_SEND_URL": "",
+        "WA_WEBHOOK_VERIFY_TOKEN": "whatsapp-mcp-verify-2026",
+        "WEBHOOK_PORT": "3000",
+        "SQLITE_DB_PATH": "/home/user/rstoi/data/whatsapp.db",
+        "MCP_TRANSPORT": "stdio",
+        "LOG_LEVEL": "info"
+      }
     }
   }
 }
