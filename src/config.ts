@@ -17,10 +17,9 @@ if (existsSync(envPath)) {
 }
 
 export const config = {
-  adapter: (process.env.WA_ADAPTER ?? "baileys") as "cloud-api" | "twilio" | "baileys",
+  adapter: (process.env.WA_ADAPTER ?? "http") as "cloud-api" | "http",
   webhookPort: parseInt(process.env.WEBHOOK_PORT ?? "3000", 10),
   mcpTransport: (process.env.MCP_TRANSPORT ?? "stdio") as "stdio" | "http",
   logLevel: process.env.LOG_LEVEL ?? "info",
-  sessionPath: process.env.WA_SESSION_PATH ?? "./data/session",
   dbPath: process.env.SQLITE_DB_PATH ?? "./data/whatsapp.db",
 };

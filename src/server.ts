@@ -23,8 +23,8 @@ export function createMcpServer(adapter: WhatsAppAdapter): McpServer {
 export async function startServer(adapter: WhatsAppAdapter): Promise<void> {
   const mcpServer = createMcpServer(adapter);
 
-  // For Cloud API, start the webhook HTTP server to receive incoming messages
-  if (config.adapter === "cloud-api") {
+  // Start webhook server — both adapters receive inbound messages via HTTP webhook
+  if (config.adapter === "cloud-api" || config.adapter === "http") {
     const app = createWebhookServer(adapter);
     const srv = app.listen(config.webhookPort, () => {
       console.error(`[Webhook] Listening on port ${config.webhookPort}`);
