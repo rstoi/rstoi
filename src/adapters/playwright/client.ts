@@ -36,6 +36,7 @@ export class PlaywrightClient extends WhatsAppAdapter {
   private page:     Page     | null = null;
   private connected = false;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private seenKeys  = new Set<string>();
 
   private sessionDir:     string;
   private headless:       boolean;
@@ -285,13 +286,32 @@ export class PlaywrightClient extends WhatsAppAdapter {
       });
 
       const db = getDb();
+      const now = Date.now();
       for (const m of msgs) {
-        const id = `wa-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const key = `${m.chatId}|${m.text.slice(0, 80)}|${m.ts}|${m.isFromMe ? 1 : 0}`;
+        const isNew = !this.seenKeys.has(key);
+        this.seenKeys.add(key);
+
+        const id = `wa-${now}-${Math.random().toString(36).slice(2, 6)}`;
         db.prepare(`
           INSERT OR IGNORE INTO messages
             (id, chat_id, from_id, type, text, timestamp, is_group, is_from_me, status)
           VALUES (?, ?, ?, 'text', ?, ?, 0, ?, 'received')
-        `).run(id, m.chatId || "unknown", m.isFromMe ? "me" : "contact", m.text, Date.now(), m.isFromMe ? 1 : 0);
+        `).run(id, m.chatId || "unknown", m.isFromMe ? "me" : "contact", m.text, now, m.isFromMe ? 1 : 0);
+
+        if (isNew && !m.isFromMe && this.onMessage) {
+          this.onMessage({
+            id,
+            chatId: m.chatId || "unknown",
+            fromId: m.chatId || "unknown",
+            type: "text",
+            text: m.text,
+            timestamp: now,
+            isGroup: false,
+            isFromMe: false,
+            status: "delivered",
+          });
+        }
       }
     } catch { /**/ }
   }

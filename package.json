@@ -17,9 +17,11 @@
     "typecheck": "tsc --noEmit",
     "setup:chrome": "bash scripts/install-chrome.sh",
     "connect": "tsx scripts/wa-connect.ts",
-    "personal": "WA_ADAPTER=playwright tsx src/index.ts"
+    "personal": "WA_ADAPTER=playwright tsx src/index.ts",
+    "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "better-sqlite3": "^9.4.3",
     "express": "^4.18.3",
