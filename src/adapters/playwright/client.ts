@@ -98,70 +98,116 @@ export class PlaywrightClient extends WhatsAppAdapter {
     await this.page.goto("https://web.whatsapp.com", { waitUntil: "domcontentloaded" });
 
     if (!hasSession) {
-      await this.waitForQR();
+      await this.waitForQRAndLogin();
+    } else {
+      await this.waitForLogin(30_000);
+      // Session may have expired — fall back to QR
+      if (!this.connected) {
+        console.error("[playwright] Sessão expirada — aguardando novo QR…");
+        await this.waitForQRAndLogin();
+      }
     }
 
-    await this.waitForLogin();
     await this.context.storageState({ path: storageFile });
-
     this.connected = true;
     console.error("[playwright] Connected to WhatsApp Web ✓");
     this.startPolling();
   }
 
-  private async waitForQR(): Promise<void> {
-    console.error("[playwright] Aguardando QR code…");
+  private async waitForQRAndLogin(): Promise<void> {
+    // Print + refresh QR until user scans it (login detected)
+    let lastRef = "";
 
-    await this.page!.waitForSelector("canvas", { timeout: 30_000 });
-
-    // Save PNG
-    const canvas = this.page!.locator("canvas").first();
-    const qrDataUrl = await canvas.evaluate((c) => (c as HTMLCanvasElement).toDataURL("image/png"));
-    const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
-    writeFileSync(this.qrPath, Buffer.from(base64, "base64"));
-
-    // Try to extract raw QR token from DOM (WhatsApp Web stores it in data-ref)
-    const qrRef = await this.page!.evaluate((): string => {
-      const candidates = [
-        document.querySelector<HTMLElement>("[data-ref]"),
-        document.querySelector<HTMLElement>("div[tabindex] > div[role]"),
-      ];
-      for (const el of candidates) {
-        const ref = el?.getAttribute("data-ref") ?? el?.dataset?.["ref"];
-        if (ref && ref.length > 10) return ref;
-      }
-      return "";
-    });
-
-    // Print ASCII QR in terminal using qrcode npm package
-    if (qrRef) {
+    const printQR = async (): Promise<boolean> => {
       try {
-        const ascii = await QRCode.toString(qrRef, { type: "terminal", small: true });
-        process.stderr.write("\n" + ascii + "\n");
-      } catch { /**/ }
+        await this.page!.waitForSelector("canvas", { timeout: 15_000 });
+      } catch { return false; }
+
+      const canvas = this.page!.locator("canvas").first();
+      const qrDataUrl = await canvas.evaluate((c) => (c as HTMLCanvasElement).toDataURL("image/png")).catch(() => "");
+      if (!qrDataUrl) return false;
+
+      const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
+      writeFileSync(this.qrPath, Buffer.from(base64, "base64"));
+
+      // Extract QR token from DOM
+      const qrRef = await this.page!.evaluate((): string => {
+        for (const sel of ["[data-ref]", "[data-testid='qrcode'] canvas", "canvas"]) {
+          const el = document.querySelector<HTMLElement>(sel);
+          const ref = el?.getAttribute("data-ref") ?? el?.closest("[data-ref]")?.getAttribute("data-ref") ?? "";
+          if (ref && ref.length > 10) return ref;
+        }
+        return "";
+      }).catch(() => "");
+
+      if (qrRef && qrRef !== lastRef) {
+        lastRef = qrRef;
+        try {
+          const ascii = await QRCode.toString(qrRef, { type: "terminal", small: true });
+          process.stderr.write("\n" + ascii);
+        } catch { /**/ }
+        // Auto-open PNG on first QR
+        if (!lastRef) {
+          try {
+            const opener = process.platform === "darwin" ? "open" : "xdg-open";
+            execSync(`${opener} "${this.qrPath}" 2>/dev/null &`);
+          } catch { /**/ }
+        }
+      }
+
+      console.error(`\n[playwright] ┌──────────────────────────────────────────────────┐`);
+      console.error(`[playwright] │  ↑ Escaneie o QR acima com seu celular             │`);
+      console.error(`[playwright] │  WhatsApp → Aparelhos conectados → + Linkar        │`);
+      console.error(`[playwright] │  QR PNG: ${this.qrPath.padEnd(41)} │`);
+      console.error(`[playwright] │  O QR é renovado automaticamente a cada 30s        │`);
+      console.error(`[playwright] └──────────────────────────────────────────────────┘\n`);
+      return true;
+    };
+
+    // Poll: show QR, check for login every 5s, refresh QR every 25s
+    await printQR();
+    let elapsed = 0;
+    const maxWait = 300_000; // 5 minutes total
+
+    while (elapsed < maxWait) {
+      const loggedIn = await this.isLoggedIn();
+      if (loggedIn) { console.error("[playwright] QR escaneado — logado ✓"); return; }
+      await this.page!.waitForTimeout(5_000);
+      elapsed += 5_000;
+      if (elapsed % 25_000 === 0) await printQR();
     }
 
-    // Auto-open the PNG file
-    try {
-      const opener = process.platform === "darwin" ? "open" : "xdg-open";
-      execSync(`${opener} "${this.qrPath}" 2>/dev/null &`);
-    } catch { /**/ }
-
-    console.error(`\n[playwright] ┌──────────────────────────────────────────────────┐`);
-    console.error(`[playwright] │  ↑ Escaneie o QR acima com seu celular             │`);
-    console.error(`[playwright] │  WhatsApp → Aparelhos conectados → + Linkar        │`);
-    console.error(`[playwright] │  QR PNG: ${this.qrPath.padEnd(41)} │`);
-    console.error(`[playwright] └──────────────────────────────────────────────────┘\n`);
+    throw new Error("Timeout aguardando scan do QR code (5 min)");
   }
 
-  private async waitForLogin(): Promise<void> {
-    console.error("[playwright] Waiting for WhatsApp to load (scan QR if prompted)…");
-    // Wait for the chat list to appear — means we're authenticated
-    await this.page!.waitForSelector(
-      'div[aria-label="Lista de conversas"], div[aria-label="Chat list"], [data-testid="chat-list"]',
-      { timeout: 120_000 },
-    );
-    console.error("[playwright] Chat list visible — authenticated ✓");
+  private async isLoggedIn(): Promise<boolean> {
+    if (!this.page) return false;
+    return this.page.evaluate((): boolean => {
+      const selectors = [
+        '[aria-label="Lista de conversas"]',
+        '[aria-label="Chat list"]',
+        '[aria-label="Conversation list"]',
+        '[data-testid="chat-list"]',
+        '[data-testid="default-user"]',
+        'header [data-testid="user-avatar"]',
+        '#side header',
+      ];
+      return selectors.some(s => Boolean(document.querySelector(s)));
+    }).catch(() => false);
+  }
+
+  private async waitForLogin(timeout = 180_000): Promise<void> {
+    console.error("[playwright] Aguardando WhatsApp carregar…");
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (await this.isLoggedIn()) {
+        console.error("[playwright] Chat list visível — autenticado ✓");
+        this.connected = true;
+        return;
+      }
+      await this.page!.waitForTimeout(2_000);
+    }
+    this.connected = false;
   }
 
   async disconnect(): Promise<void> {
