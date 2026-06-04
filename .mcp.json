@@ -11,36 +11,20 @@
       }
     },
     "whatsapp-business": {
-      "command": "/home/user/rstoi/node_modules/.bin/tsx",
+      "_comment": "WhatsApp pessoal via Playwright/Chromium. Requer: npm run setup:chrome && npm run connect",
+      "command": "node_modules/.bin/tsx",
       "args": ["src/index.ts"],
       "cwd": "/home/user/rstoi",
       "env": {
         "PATH": "/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/root",
-        "WA_ADAPTER": "http",
-        "WA_HTTP_PHONE": "5511999990000",
-        "WA_HTTP_SEND_URL": "",
-        "WA_WEBHOOK_VERIFY_TOKEN": "whatsapp-mcp-verify-2026",
-        "WEBHOOK_PORT": "3000",
-        "SQLITE_DB_PATH": "/home/user/rstoi/data/whatsapp.db",
-        "MCP_TRANSPORT": "stdio",
-        "LOG_LEVEL": "info"
-      }
-    },
-    "whatsapp-personal": {
-      "_comment": "Para uso na máquina local com WhatsApp pessoal via Playwright/Chromium.",
-      "_setup": "Execute primeiro: npm run setup:chrome && npm run connect",
-      "command": "node_modules/.bin/tsx",
-      "args": ["src/index.ts"],
-      "cwd": ".",
-      "env": {
         "WA_ADAPTER": "playwright",
         "WA_HEADLESS": "true",
-        "WA_SESSION_DIR": "./data/wa-session",
-        "WA_QR_PATH": "./data/qr.png",
+        "WA_SESSION_DIR": "/home/user/rstoi/data/wa-session",
+        "WA_QR_PATH": "/home/user/rstoi/data/qr.png",
         "WA_WEBHOOK_VERIFY_TOKEN": "whatsapp-mcp-verify-2026",
         "WEBHOOK_PORT": "3001",
-        "SQLITE_DB_PATH": "./data/whatsapp-personal.db",
+        "SQLITE_DB_PATH": "/home/user/rstoi/data/whatsapp-personal.db",
         "MCP_TRANSPORT": "stdio",
         "LOG_LEVEL": "info"
       }
