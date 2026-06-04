@@ -11,6 +11,9 @@ async function main(): Promise<void> {
   if (config.adapter === "cloud-api") {
     const { CloudApiClient } = await import("./adapters/cloud-api/index.js");
     adapter = new CloudApiClient();
+  } else if (config.adapter === "playwright") {
+    const { PlaywrightClient } = await import("./adapters/playwright/index.js");
+    adapter = new PlaywrightClient();
   } else {
     const { HttpClient } = await import("./adapters/http/index.js");
     adapter = new HttpClient();

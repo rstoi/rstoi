@@ -17,7 +17,7 @@ if (existsSync(envPath)) {
 }
 
 export const config = {
-  adapter: (process.env.WA_ADAPTER ?? "http") as "cloud-api" | "http",
+  adapter: (process.env.WA_ADAPTER ?? "http") as "cloud-api" | "http" | "playwright",
   webhookPort: parseInt(process.env.WEBHOOK_PORT ?? "3000", 10),
   mcpTransport: (process.env.MCP_TRANSPORT ?? "stdio") as "stdio" | "http",
   logLevel: process.env.LOG_LEVEL ?? "info",
