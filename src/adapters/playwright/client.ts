@@ -20,6 +20,7 @@ import { chromium, type Browser, type BrowserContext, type Page } from "playwrig
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
+import QRCode from "qrcode";
 import type {
   Message, Chat, Group, Contact,
   SendMessageOptions, SentMessage,
@@ -109,34 +110,48 @@ export class PlaywrightClient extends WhatsAppAdapter {
   }
 
   private async waitForQR(): Promise<void> {
-    console.error("[playwright] Waiting for QR code…");
+    console.error("[playwright] Aguardando QR code…");
 
     await this.page!.waitForSelector("canvas", { timeout: 30_000 });
 
+    // Save PNG
     const canvas = this.page!.locator("canvas").first();
     const qrDataUrl = await canvas.evaluate((c) => (c as HTMLCanvasElement).toDataURL("image/png"));
     const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
     writeFileSync(this.qrPath, Buffer.from(base64, "base64"));
 
-    // Print ASCII QR in terminal (requires qrencode CLI if available)
-    try {
-      const qrText = await this.page!.evaluate(() => {
-        const el = document.querySelector('[data-ref]') as HTMLElement | null;
-        return el?.dataset["ref"] ?? "";
-      });
-      if (qrText) {
-        try {
-          const ascii = execSync(`echo '${qrText}' | qrencode -t UTF8 -o -`, { encoding: "utf8" });
-          console.error("\n" + ascii);
-        } catch { /**/ }
+    // Try to extract raw QR token from DOM (WhatsApp Web stores it in data-ref)
+    const qrRef = await this.page!.evaluate((): string => {
+      const candidates = [
+        document.querySelector<HTMLElement>("[data-ref]"),
+        document.querySelector<HTMLElement>("div[tabindex] > div[role]"),
+      ];
+      for (const el of candidates) {
+        const ref = el?.getAttribute("data-ref") ?? el?.dataset?.["ref"];
+        if (ref && ref.length > 10) return ref;
       }
+      return "";
+    });
+
+    // Print ASCII QR in terminal using qrcode npm package
+    if (qrRef) {
+      try {
+        const ascii = await QRCode.toString(qrRef, { type: "terminal", small: true });
+        process.stderr.write("\n" + ascii + "\n");
+      } catch { /**/ }
+    }
+
+    // Auto-open the PNG file
+    try {
+      const opener = process.platform === "darwin" ? "open" : "xdg-open";
+      execSync(`${opener} "${this.qrPath}" 2>/dev/null &`);
     } catch { /**/ }
 
-    console.error(`[playwright] ┌──────────────────────────────────────────────────┐`);
-    console.error(`[playwright] │  Escaneie o QR code abaixo com seu celular        │`);
-    console.error(`[playwright] │  QR PNG salvo em: ${this.qrPath.padEnd(30)} │`);
-    console.error(`[playwright] │  WhatsApp → Dispositivos vinculados → + Linkar    │`);
-    console.error(`[playwright] └──────────────────────────────────────────────────┘`);
+    console.error(`\n[playwright] ┌──────────────────────────────────────────────────┐`);
+    console.error(`[playwright] │  ↑ Escaneie o QR acima com seu celular             │`);
+    console.error(`[playwright] │  WhatsApp → Aparelhos conectados → + Linkar        │`);
+    console.error(`[playwright] │  QR PNG: ${this.qrPath.padEnd(41)} │`);
+    console.error(`[playwright] └──────────────────────────────────────────────────┘\n`);
   }
 
   private async waitForLogin(): Promise<void> {
