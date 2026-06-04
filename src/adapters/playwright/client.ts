@@ -4,20 +4,22 @@
  * Connects to WhatsApp by automating web.whatsapp.com in a real Chromium
  * browser. No third-party WhatsApp library, no Meta/Facebook account.
  *
- * First run: displays QR code → scan with phone → session saved locally.
+ * First run: saves QR code to ./data/qr.png + prints ASCII QR in terminal.
  * Subsequent runs: restores session automatically (no QR needed).
  *
- * Required: npm install playwright && npx playwright install chromium
+ * Required: npx playwright install chromium
  *
  * Env vars (optional):
- *   WA_SESSION_DIR   — where to persist browser session (default: ./data/wa-session)
- *   WA_HEADLESS      — "false" to show browser window (default: true)
- *   WA_QR_PATH       — path to save QR code PNG (default: ./data/qr.png)
+ *   WA_SESSION_DIR    — where to persist browser session (default: ./data/wa-session)
+ *   WA_HEADLESS       — "false" to show browser window (default: true)
+ *   WA_QR_PATH        — path to save QR code PNG (default: ./data/qr.png)
+ *   WA_CHROMIUM_PATH  — path to Chromium executable (auto-detected if not set)
  */
 
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
+import { execSync } from "child_process";
 import type {
   Message, Chat, Group, Contact,
   SendMessageOptions, SentMessage,
@@ -34,17 +36,34 @@ export class PlaywrightClient extends WhatsAppAdapter {
   private connected = false;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
-  private sessionDir: string;
-  private headless:   boolean;
-  private qrPath:     string;
+  private sessionDir:     string;
+  private headless:       boolean;
+  private qrPath:         string;
+  private executablePath: string | undefined;
 
   constructor() {
     super();
-    this.sessionDir = resolve(process.env.WA_SESSION_DIR ?? "./data/wa-session");
-    this.headless   = process.env.WA_HEADLESS !== "false";
-    this.qrPath     = resolve(process.env.WA_QR_PATH ?? "./data/qr.png");
+    this.sessionDir     = resolve(process.env.WA_SESSION_DIR ?? "./data/wa-session");
+    this.headless       = process.env.WA_HEADLESS !== "false";
+    this.qrPath         = resolve(process.env.WA_QR_PATH ?? "./data/qr.png");
+    this.executablePath = process.env.WA_CHROMIUM_PATH ?? this.detectChromium();
     mkdirSync(this.sessionDir, { recursive: true });
     mkdirSync(resolve("./data"), { recursive: true });
+  }
+
+  private detectChromium(): string | undefined {
+    const candidates = [
+      "/opt/chromium/chrome-linux/chrome",          // downloaded by setup
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/google-chrome",
+      "/usr/bin/chromium",
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    ];
+    for (const p of candidates) {
+      if (existsSync(p)) { console.error(`[playwright] Using Chromium: ${p}`); return p; }
+    }
+    return undefined; // playwright will use its own managed browser
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -57,7 +76,13 @@ export class PlaywrightClient extends WhatsAppAdapter {
 
     this.browser = await chromium.launch({
       headless: this.headless,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      executablePath: this.executablePath,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled",
+      ],
     });
 
     this.context = await this.browser.newContext({
@@ -86,20 +111,32 @@ export class PlaywrightClient extends WhatsAppAdapter {
   private async waitForQR(): Promise<void> {
     console.error("[playwright] Waiting for QR code…");
 
-    // Wait for QR canvas to appear
     await this.page!.waitForSelector("canvas", { timeout: 30_000 });
 
-    // Save QR as PNG
     const canvas = this.page!.locator("canvas").first();
     const qrDataUrl = await canvas.evaluate((c) => (c as HTMLCanvasElement).toDataURL("image/png"));
     const base64 = qrDataUrl.replace(/^data:image\/png;base64,/, "");
     writeFileSync(this.qrPath, Buffer.from(base64, "base64"));
 
-    console.error(`[playwright] ┌─────────────────────────────────────────────┐`);
-    console.error(`[playwright] │  QR code saved to: ${this.qrPath.padEnd(25)}│`);
-    console.error(`[playwright] │  Open the file and scan with WhatsApp        │`);
-    console.error(`[playwright] │  WhatsApp → Dispositivos vinculados → + Link │`);
-    console.error(`[playwright] └─────────────────────────────────────────────┘`);
+    // Print ASCII QR in terminal (requires qrencode CLI if available)
+    try {
+      const qrText = await this.page!.evaluate(() => {
+        const el = document.querySelector('[data-ref]') as HTMLElement | null;
+        return el?.dataset["ref"] ?? "";
+      });
+      if (qrText) {
+        try {
+          const ascii = execSync(`echo '${qrText}' | qrencode -t UTF8 -o -`, { encoding: "utf8" });
+          console.error("\n" + ascii);
+        } catch { /**/ }
+      }
+    } catch { /**/ }
+
+    console.error(`[playwright] ┌──────────────────────────────────────────────────┐`);
+    console.error(`[playwright] │  Escaneie o QR code abaixo com seu celular        │`);
+    console.error(`[playwright] │  QR PNG salvo em: ${this.qrPath.padEnd(30)} │`);
+    console.error(`[playwright] │  WhatsApp → Dispositivos vinculados → + Linkar    │`);
+    console.error(`[playwright] └──────────────────────────────────────────────────┘`);
   }
 
   private async waitForLogin(): Promise<void> {
