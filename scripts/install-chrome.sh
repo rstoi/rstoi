@@ -28,10 +28,29 @@ fi
 
 echo "==> Playwright não suporta este OS — instalando Google Chrome via apt"
 
+# Verificar se já está instalado
+if command -v google-chrome-stable &>/dev/null || command -v google-chrome &>/dev/null; then
+  echo "==> Google Chrome já instalado"
+  CHROME_BIN=$(command -v google-chrome-stable || command -v google-chrome)
+  grep -v "^WA_CHROMIUM_PATH" .env > /tmp/.env.tmp 2>/dev/null && mv /tmp/.env.tmp .env || true
+  echo "WA_CHROMIUM_PATH=$CHROME_BIN" >> .env
+  echo "==> Pronto! Execute: npm run connect"
+  exit 0
+fi
+
 # Google Chrome .deb (funciona em qualquer Ubuntu/Debian)
 CHROME_DEB=$(mktemp --suffix=.deb)
 echo "==> Baixando Google Chrome…"
-curl -fsSL "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -o "$CHROME_DEB"
+DOWNLOADER=""
+if command -v curl &>/dev/null; then
+  DOWNLOADER="curl -fsSL"
+elif command -v wget &>/dev/null; then
+  DOWNLOADER="wget -q -O"
+else
+  echo "ERRO: instale curl ou wget primeiro: sudo apt install curl"
+  exit 1
+fi
+$DOWNLOADER "$CHROME_DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
 
 echo "==> Instalando…"
 sudo dpkg -i "$CHROME_DEB" 2>/dev/null || true
