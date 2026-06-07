@@ -6,6 +6,7 @@ import { registerAllTools } from "./tools/index.js";
 import { registerAllResources } from "./resources/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import { createWebhookServer } from "./webhook.js";
+import { registerTreasuryTools } from "./treasury/tools.js";
 
 export function createMcpServer(adapter: WhatsAppAdapter): McpServer {
   const server = new McpServer({
@@ -16,6 +17,7 @@ export function createMcpServer(adapter: WhatsAppAdapter): McpServer {
   registerAllTools(server, adapter);
   registerAllResources(server, adapter);
   registerAllPrompts(server);
+  registerTreasuryTools(server);
 
   return server;
 }

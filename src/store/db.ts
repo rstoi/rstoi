@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
+import { initTreasurySchema } from "../treasury/db.js";
 
 let db: Database.Database | null = null;
 
@@ -12,6 +13,7 @@ export function getDb(): Database.Database {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   initSchema(db);
+  initTreasurySchema(db);
   return db;
 }
 
