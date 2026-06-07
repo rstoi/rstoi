@@ -18,7 +18,10 @@
     "setup:chrome": "bash scripts/install-chrome.sh",
     "connect": "tsx scripts/wa-connect.ts",
     "personal": "WA_ADAPTER=playwright tsx src/index.ts",
-    "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts"
+    "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts",
+    "treasury:demo": "tsx scripts/treasury-demo.ts",
+    "treasury:run": "tsx scripts/treasury-run.ts",
+    "treasury:run:dry": "tsx scripts/treasury-run.ts --dry-run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
