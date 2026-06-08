@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Session Viewer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f0883e;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: #30363d; }
+    .btn.primary { background: #f0883e; border-color: #f0883e; color: #000; font-weight: 600; }
+    .btn.primary:hover { background: #e07830; }
+
+    .meta-bar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 8px 24px;
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .meta-bar span b { color: #e6edf3; }
+
+    #drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: calc(100vh - 57px);
+      gap: 16px;
+      color: #8b949e;
+    }
+
+    #drop-zone.drag-over {
+      background: #161b22;
+    }
+
+    #drop-zone svg { opacity: 0.4; }
+
+    #drop-zone p { font-size: 15px; }
+
+    #conversation {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: none;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .turn {
+      display: flex;
+      gap: 12px;
+      padding: 16px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .turn:last-child { border-bottom: none; }
+
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .avatar.user { background: #388bfd22; color: #388bfd; border: 1px solid #388bfd44; }
+    .avatar.assistant { background: #f0883e22; color: #f0883e; border: 1px solid #f0883e44; }
+
+    .bubble {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .bubble-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .role-label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .role-label.user { color: #388bfd; }
+    .role-label.assistant { color: #f0883e; }
+
+    .timestamp {
+      font-size: 11px;
+      color: #484f58;
+    }
+
+    .content {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #c9d1d9;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Markdown rendering */
+    .content h1, .content h2, .content h3 {
+      color: #e6edf3;
+      margin: 16px 0 8px;
+      font-weight: 600;
+    }
+    .content h1 { font-size: 18px; border-bottom: 1px solid #30363d; padding-bottom: 6px; }
+    .content h2 { font-size: 16px; }
+    .content h3 { font-size: 14px; }
+
+    .content p { margin: 6px 0; }
+
+    .content code {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #f0883e;
+    }
+
+    .content pre {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    .content pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #e6edf3;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .content ul, .content ol {
+      padding-left: 20px;
+      margin: 6px 0;
+    }
+
+    .content li { margin: 3px 0; }
+
+    .content table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 10px 0;
+      font-size: 13px;
+    }
+
+    .content th, .content td {
+      border: 1px solid #30363d;
+      padding: 6px 12px;
+      text-align: left;
+    }
+
+    .content th { background: #161b22; color: #e6edf3; font-weight: 600; }
+    .content tr:nth-child(even) td { background: #0d111780; }
+
+    .content strong { color: #e6edf3; font-weight: 600; }
+    .content em { color: #8b949e; }
+
+    .content a { color: #388bfd; text-decoration: none; }
+    .content a:hover { text-decoration: underline; }
+
+    .content blockquote {
+      border-left: 3px solid #30363d;
+      padding-left: 12px;
+      color: #8b949e;
+      margin: 8px 0;
+    }
+
+    .tool-call {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin: 6px 0;
+      font-size: 12px;
+      color: #8b949e;
+      font-family: monospace;
+    }
+
+    .tool-call .tool-name { color: #7ee787; font-weight: 600; }
+
+    #stats {
+      display: none;
+      padding: 4px 24px;
+      background: #0d1117;
+      border-bottom: 1px solid #21262d;
+      font-size: 12px;
+      color: #484f58;
+      gap: 16px;
+    }
+
+    .filter-bar {
+      display: none;
+      padding: 8px 24px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .filter-bar input {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 260px;
+    }
+
+    .filter-bar input:focus { outline: none; border-color: #388bfd; }
+
+    .filter-btn {
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid #30363d;
+      background: transparent;
+      color: #8b949e;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .filter-btn.active { background: #21262d; color: #e6edf3; border-color: #8b949e; }
+
+    .highlight { background: #f0883e44; border-radius: 2px; }
+
+    @media (max-width: 600px) {
+      #conversation { padding: 12px 8px; }
+      .avatar { width: 26px; height: 26px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f0883e" stroke-width="2">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+  <h1>Claude Session Viewer</h1>
+  <label for="file-input" class="btn primary">Abrir JSONL</label>
+  <input type="file" id="file-input" accept=".jsonl,.json">
+  <button class="btn" id="btn-export" style="display:none">Exportar TXT</button>
+</header>
+
+<div class="meta-bar" id="meta-bar" style="display:none"></div>
+
+<div class="filter-bar" id="filter-bar">
+  <input type="text" id="search-input" placeholder="Buscar no diálogo...">
+  <button class="filter-btn active" data-filter="all">Todos</button>
+  <button class="filter-btn" data-filter="user">Usuário</button>
+  <button class="filter-btn" data-filter="assistant">Assistente</button>
+</div>
+
+<div id="drop-zone">
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="12" y1="18" x2="12" y2="12"/>
+    <line x1="9" y1="15" x2="15" y2="15"/>
+  </svg>
+  <p>Arraste um arquivo <strong>.jsonl</strong> aqui ou clique em <strong>Abrir JSONL</strong></p>
+  <p style="font-size:12px">Arquivos em <code style="color:#f0883e;background:#f0883e11;padding:2px 6px;border-radius:4px">~/.claude/projects/</code></p>
+</div>
+
+<div id="conversation"></div>
+
+<script>
+  // Simple markdown parser
+  function renderMarkdown(text) {
+    if (!text) return '';
+
+    // Escape HTML
+    const escape = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // Code blocks
+    text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+      `<pre><code class="lang-${lang}">${escape(code.trimEnd())}</code></pre>`
+    );
+
+    // Inline code
+    text = text.replace(/`([^`\n]+)`/g, (_, c) => `<code>${escape(c)}</code>`);
+
+    // Headers
+    text = text.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    text = text.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    text = text.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Bold / italic
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    // Tables
+    text = text.replace(/((?:\|.+\|\n?)+)/g, (block) => {
+      const rows = block.trim().split('\n').filter(r => !/^\|[\s\-|]+\|$/.test(r));
+      if (rows.length < 2) return block;
+      const header = rows[0].split('|').filter((_, i, a) => i > 0 && i < a.length - 1);
+      const body = rows.slice(1);
+      const th = header.map(h => `<th>${h.trim()}</th>`).join('');
+      const trs = body.map(r => {
+        const cells = r.split('|').filter((_, i, a) => i > 0 && i < a.length - 1);
+        return `<tr>${cells.map(c => `<td>${c.trim()}</td>`).join('')}</tr>`;
+      }).join('');
+      return `<table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+    });
+
+    // Blockquote
+    text = text.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Lists
+    text = text.replace(/((?:^- .+\n?)+)/gm, (block) => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^- /, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    });
+    text = text.replace(/((?:^\d+\. .+\n?)+)/gm, (block) => {
+      const items = block.trim().split('\n').map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`).join('');
+      return `<ol>${items}</ol>`;
+    });
+
+    // Links
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+    // Line breaks (preserve paragraphs)
+    text = text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+    text = `<p>${text}</p>`;
+
+    // Clean up empty tags
+    text = text.replace(/<p>\s*<\/p>/g, '');
+    text = text.replace(/<p>(<(?:pre|ul|ol|table|h[1-6]|blockquote))/g, '$1');
+    text = text.replace(/(</(?:pre|ul|ol|table|h[1-6]|blockquote)>)<\/p>/g, '$1');
+
+    return text;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    try {
+      return new Date(ts).toLocaleString('pt-BR');
+    } catch { return ts; }
+  }
+
+  let allTurns = [];
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let exportText = '';
+
+  function parseTurns(lines) {
+    const turns = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.type === 'user' || obj.type === 'assistant') {
+          const msg = obj.message || {};
+          let text = '';
+          let toolCalls = [];
+
+          if (Array.isArray(msg.content)) {
+            for (const block of msg.content) {
+              if (block.type === 'text') text += block.text;
+              else if (block.type === 'tool_use') toolCalls.push(block);
+            }
+          } else if (typeof msg.content === 'string') {
+            text = msg.content;
+          }
+
+          if (text.trim() || toolCalls.length) {
+            turns.push({
+              role: obj.type,
+              text: text.trim(),
+              toolCalls,
+              timestamp: obj.timestamp,
+              uuid: obj.uuid,
+            });
+          }
+        }
+      } catch {}
+    }
+    return turns;
+  }
+
+  function renderTurns(turns, search) {
+    const container = document.getElementById('conversation');
+    container.innerHTML = '';
+
+    const keyword = search.trim().toLowerCase();
+
+    for (const t of turns) {
+      if (currentFilter !== 'all' && t.role !== currentFilter) continue;
+      if (keyword && !t.text.toLowerCase().includes(keyword)) continue;
+
+      const turn = document.createElement('div');
+      turn.className = 'turn';
+      turn.dataset.role = t.role;
+
+      const initial = t.role === 'user' ? 'U' : 'A';
+      let displayText = renderMarkdown(t.text);
+
+      if (keyword) {
+        const re = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        displayText = displayText.replace(re, '<mark class="highlight">$1</mark>');
+      }
+
+      let toolHtml = '';
+      for (const tc of t.toolCalls) {
+        toolHtml += `<div class="tool-call">⚙ <span class="tool-name">${tc.name}</span>${tc.input ? ' — ' + JSON.stringify(tc.input).slice(0, 120) : ''}</div>`;
+      }
+
+      turn.innerHTML = `
+        <div class="avatar ${t.role}">${initial}</div>
+        <div class="bubble">
+          <div class="bubble-header">
+            <span class="role-label ${t.role}">${t.role === 'user' ? 'Usuário' : 'Assistente'}</span>
+            <span class="timestamp">${formatTime(t.timestamp)}</span>
+          </div>
+          <div class="content">${displayText}${toolHtml}</div>
+        </div>
+      `;
+
+      container.appendChild(turn);
+    }
+
+    if (!container.children.length) {
+      container.innerHTML = '<div style="text-align:center;padding:48px;color:#484f58">Nenhuma mensagem encontrada.</div>';
+    }
+  }
+
+  function loadFile(text, filename) {
+    const lines = text.split('\n');
+    allTurns = parseTurns(lines);
+
+    if (!allTurns.length) {
+      alert('Nenhuma mensagem encontrada neste arquivo.');
+      return;
+    }
+
+    // Meta info
+    try {
+      const first = JSON.parse(lines.find(l => l.trim()));
+      const meta = document.getElementById('meta-bar');
+      meta.style.display = 'flex';
+      meta.innerHTML = `
+        <span><b>Arquivo:</b> ${filename}</span>
+        <span><b>Projeto:</b> ${first.cwd || '—'}</span>
+        <span><b>Branch:</b> ${first.gitBranch || '—'}</span>
+        <span><b>Sessão:</b> ${first.sessionId || '—'}</span>
+        <span><b>Mensagens:</b> ${allTurns.length}</span>
+      `;
+    } catch {}
+
+    // Export text
+    exportText = allTurns.map(t =>
+      `[${t.role.toUpperCase()}] ${formatTime(t.timestamp)}\n${t.text}\n`
+    ).join('\n---\n\n');
+
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('conversation').style.display = 'flex';
+    document.getElementById('filter-bar').style.display = 'flex';
+    document.getElementById('btn-export').style.display = 'inline-block';
+
+    renderTurns(allTurns, '');
+  }
+
+  // File input
+  document.getElementById('file-input').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => loadFile(ev.target.result, file.name);
+    reader.readAsText(file);
+  });
+
+  // Drag & drop
+  const dropZone = document.getElementById('drop-zone');
+  document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  document.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => loadFile(ev.target.result, file.name);
+    reader.readAsText(file);
+  });
+
+  // Filter buttons
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      renderTurns(allTurns, currentSearch);
+    });
+  });
+
+  // Search
+  let searchTimer;
+  document.getElementById('search-input').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      currentSearch = e.target.value;
+      renderTurns(allTurns, currentSearch);
+    }, 200);
+  });
+
+  // Export
+  document.getElementById('btn-export').addEventListener('click', () => {
+    const blob = new Blob([exportText], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'dialogo.txt';
+    a.click();
+  });
+</script>
+</body>
+</html>
