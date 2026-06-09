@@ -50,7 +50,7 @@ def fig_camadas():
          "Onde o profissional interage — a mesma IA em cada tela", BLUE, LIGHT, 78),
         ("ORQUESTRAÇÃO — “o cérebro”", "Roteador multimodelo · Harness loop · Memória · Catálogo de agentes",
          "Decide o modelo, conduz o ciclo e mantém o contexto", TEAL, LIGHT2, 56.5),
-        ("FERRAMENTAS / CONECTORES  (MCP)", "WhatsApp · Gmail · Calendar · Drive · GitHub · computer-use · ERP/CRM",
+        ("FERRAMENTAS / CONECTORES  (MCP)", "WhatsApp · Google Workspace · GitHub · computer-use · Sistemas internos (Projetos/Contratos/Comercial)",
          "A “tomada universal” que liga a IA aos sistemas reais", SLATE, GREY, 35),
         ("DADOS E GOVERNANÇA", "SSO Google · Cofre de segredos · Auditoria · DLP · Backup",
          "Segurança, permissões mínimas e conformidade por padrão", INK, "#E8ECF1", 13.5),
@@ -59,7 +59,7 @@ def fig_camadas():
         rounded(ax, 6, y, 88, 18, bg, r=0.03)
         rounded(ax, 6, y, 1.6, 18, accent, r=0.03)  # barra lateral
         text(ax, 10.5, y + 14.0, title, 12.5, accent, "bold", ha="left")
-        text(ax, 10.5, y + 8.4, mid, 9.6, INK, "normal", ha="left")
+        text(ax, 10.5, y + 8.4, mid, 8.6, INK, "normal", ha="left")
         text(ax, 10.5, y + 3.4, sub, 8.4, SLATE, "italic", ha="left")
 
     # setas entre camadas (fluxo bidirecional de contexto)
@@ -155,10 +155,10 @@ def fig_roadmap():
     # linha base
     ax.plot([8, 92], [50, 50], color=SLATE, lw=2.2, zorder=1)
     phases = [
-        ("FASE 1", "Fundação", "SSO + cofre;\nMCPs no ar", "Sem. 1–2", BLUE, 18, True),
-        ("FASE 2", "Primeiros agentes", "Executivo +\nAtendimento", "Sem. 3–5", TEAL, 40, False),
-        ("FASE 3", "Conhecimento", "RAG + agentes\n+ multidisp.", "Sem. 6–9", AMBER, 62, True),
-        ("FASE 4", "Governança", "Auditoria, DLP,\nmétricas", "Contínuo", INK, 84, False),
+        ("FASE 1", "Fundação", "SSO, cofre e\nMCPs no ar", "Início", BLUE, 18, True),
+        ("FASE 2", "Conectar o que há", "Projetos, Contratos\ne Comercial", "Em seguida", TEAL, 40, False),
+        ("FASE 3", "Agentes + RAG", "Base de conhec.\n+ multidisp.", "Sequência", AMBER, 62, True),
+        ("FASE 4", "Governança", "Auditoria, DLP\ne indicadores", "Contínuo", INK, 84, False),
     ]
     for ph, title, desc, when, c, x, up in phases:
         ax.add_patch(plt.Circle((x, 50), 2.6, color=c, zorder=3))
@@ -175,30 +175,88 @@ def fig_roadmap():
 
 
 # ---------------------------------------------------------------------------
-# 5. KPIs / impacto esperado (barras)
+# 5. FRAMEWORK DE INDICADORES (sem números — medidos sobre a própria operação)
 # ---------------------------------------------------------------------------
-def fig_kpis():
-    fig, ax = plt.subplots(figsize=(8.8, 4.4), dpi=200)
-    labels = ["Tempo em\ne-mail/agenda", "1ª resposta\nno WhatsApp",
-              "Geração de\ndocumentos", "Tarefas sem\nintervenção"]
-    before = [100, 100, 100, 0]
-    after  = [45, 25, 30, 60]
-    x = np.arange(len(labels))
-    w = 0.36
-    ax.bar(x - w/2, before, w, label="Hoje (linha de base)", color="#C7D2DD")
-    ax.bar(x + w/2, after, w, label="Com IA (meta)", color=BLUE)
-    for i, v in enumerate(after):
-        ax.text(i + w/2, v + 3, f"{v}%", ha="center", fontsize=9, color=INK, weight="bold")
-    ax.set_ylim(0, 120)
-    ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=9, color=INK)
-    ax.set_yticks([])
-    for s in ["top", "right", "left"]:
-        ax.spines[s].set_visible(False)
-    ax.spines["bottom"].set_color(SLATE)
-    ax.legend(loc="upper right", frameon=False, fontsize=9)
-    ax.set_title("Impacto esperado (índice — quanto menor o esforço, melhor)",
-                 fontsize=13, color=INK, weight="bold", pad=12)
-    fig.savefig(f"{A}/05_kpis.png", bbox_inches="tight", facecolor=WHITE)
+def fig_indicadores():
+    fig, ax = plt.subplots(figsize=(9.0, 5.4), dpi=200)
+    ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis("off")
+    text(ax, 50, 95, "Framework de indicadores", 15, INK, "bold")
+    text(ax, 50, 88,
+         "O que acompanhar — sem números presumidos: a linha de base é medida na "
+         "operação e as metas saem dela",
+         8.6, SLATE, "italic")
+
+    cards = [
+        ("PRODUTIVIDADE", BLUE, LIGHT,
+         ["Tempo poupado por pessoa", "Retrabalho evitado",
+          "Tarefas automatizadas"], 6, 47),
+        ("QUALIDADE", TEAL, LIGHT2,
+         ["Consistência dos entregáveis", "Erros e correções",
+          "Tempo de 1ª resposta"], 51, 47),
+        ("PESSOAS & CLIMA", AMBER, "#FDF3E0",
+         ["Sobrecarga percebida", "eNPS / satisfação",
+          "Segurança psicológica"], 6, 9),
+        ("SEGURANÇA & GOVERNANÇA", INK, "#E8ECF1",
+         ["Incidentes com dados", "% de ações auditadas",
+          "Aderência a permissões"], 51, 9),
+    ]
+    w, h = 43, 33
+    for title, accent, bg, items, x, y in cards:
+        rounded(ax, x, y, w, h, bg, r=0.05)
+        rounded(ax, x, y + h - 6.5, w, 6.5, accent, r=0.05)
+        rounded(ax, x, y + h - 6.5, w, 3, accent, r=0.0)  # quadra o canto inferior da faixa
+        text(ax, x + w/2, y + h - 3.2, title, 11, WHITE, "bold")
+        for i, it in enumerate(items):
+            yy = y + h - 12 - i * 6.2
+            ax.add_patch(plt.Circle((x + 4.5, yy + 0.6), 0.9, color=accent, zorder=5))
+            text(ax, x + 7.5, yy, it, 9.0, INK, "normal", ha="left")
+    fig.savefig(f"{A}/05_indicadores.png", bbox_inches="tight", facecolor=WHITE)
+    plt.close(fig)
+
+
+# ---------------------------------------------------------------------------
+# 6. PESSOAS — clima, segurança psicológica e condições de trabalho
+# ---------------------------------------------------------------------------
+def fig_pessoas():
+    fig, ax = plt.subplots(figsize=(9.4, 5.2), dpi=200)
+    ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis("off")
+    text(ax, 50, 95, "Pessoas no centro", 15, INK, "bold")
+    text(ax, 50, 88,
+         "A IA assume o trabalho repetitivo e penoso — e devolve tempo, energia e tranquilidade",
+         9, SLATE, "italic")
+
+    steps = [
+        ("IA assume\no repetitivo", "Triagem, status de\nprojetos, documentos", BLUE, 13.5),
+        ("Libera tempo\ne energia", "Foco no que é\ncriativo e humano", TEAL, 37.8),
+        ("Menos sobrecarga\ne menos erro", "Rascunho revisável\nantes de agir", AMBER, 62.2),
+        ("Mais clima e\nseg. psicológica", "Confiança para\npropor e pedir ajuda", "#2E8B57", 86.5),
+    ]
+    bw = 21
+    for i, (title, desc, c, x) in enumerate(steps):
+        rounded(ax, x - bw/2, 50, bw, 22, c, r=0.10)
+        text(ax, x, 65, title, 8.8, WHITE, "bold")
+        text(ax, x, 56, desc, 7.2, WHITE)
+        if i < 3:
+            ax.add_patch(FancyArrowPatch((x + bw/2, 61), (steps[i+1][3] - bw/2 - 0.5, 61),
+                         arrowstyle="-|>", mutation_scale=15, color=INK, lw=1.8, zorder=6))
+
+    # princípios (chips)
+    text(ax, 50, 38, "Princípios que sustentam a confiança", 10, INK, "bold")
+    chips = [
+        ("Aumenta, não vigia", BLUE),
+        ("Mentor sem julgar", TEAL),
+        ("Erro fica no rascunho", AMBER),
+        ("Decisão é humana", INK),
+    ]
+    cw, gap = 22, 2
+    total = len(chips) * cw + (len(chips) - 1) * gap
+    x0 = (100 - total) / 2
+    for i, (label, c) in enumerate(chips):
+        x = x0 + i * (cw + gap)
+        rounded(ax, x, 20, cw, 11, "#FFFFFF", ec=c, lw=1.6, r=0.18)
+        rounded(ax, x, 20, 1.4, 11, c, r=0.0)
+        text(ax, x + cw/2 + 0.7, 25.5, label, 7.6, INK, "bold")
+    fig.savefig(f"{A}/06_pessoas.png", bbox_inches="tight", facecolor=WHITE)
     plt.close(fig)
 
 
@@ -226,5 +284,6 @@ if __name__ == "__main__":
     fig_loop()
     fig_modelos()
     fig_roadmap()
-    fig_kpis()
+    fig_indicadores()
+    fig_pessoas()
     print("Gráficos gerados em", A)

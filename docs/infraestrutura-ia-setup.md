@@ -151,11 +151,12 @@ multimodelo.
 | Agente | Função | Conectores MCP principais |
 |---|---|---|
 | **Assistente Executivo** | Triagem de e-mail, agenda, resumos diários, preparação de reuniões. | Gmail, Calendar, Drive |
-| **Atendimento / SDR** | Responde clientes no WhatsApp, qualifica leads, agenda demos. | WhatsApp, Calendar, CRM |
-| **Operações de Documentos** | Gera/organiza propostas, contratos, relatórios; OCR de notas. | Drive, visão/OCR |
+| **Atendimento / SDR** | Responde clientes no WhatsApp, qualifica leads, agenda demos. | WhatsApp, sist. Comercial |
+| **PMO / Projetos** | Atualiza status, gera relatórios e antecipa riscos nos projetos. | sist. Projetos, Drive |
+| **Contratos** | Gera/organiza contratos, acompanha prazos, OCR de documentos. | sist. Contratos, visão/OCR |
 | **Suporte Técnico / IT Helpdesk** | Abre/resolve chamados, executa runbooks, opera máquinas. | computer-use, GitHub, ITSM |
-| **DevOps / Engenharia** | Revisa PRs, corrige CI, automatiza deploys. | GitHub, computer-use |
-| **Financeiro** | Concilia, organiza despesas, gera relatórios a partir de notas. | Drive, ERP, planilhas |
+| **DevOps / Engenharia** | Revisa PRs, corrige CI, evolui os sistemas internos. | GitHub, computer-use |
+| **Financeiro** | Concilia, organiza despesas, gera relatórios a partir de notas. | sist. Contratos, ERP |
 
 Agentes podem **delegar a sub-agentes** (fan-out): ex., o Assistente Executivo
 dispara em paralelo um sub-agente "pesquisa de mercado" e outro "preparar pauta"
@@ -163,7 +164,59 @@ e consolida o resultado.
 
 ---
 
-## 7. Camada de dados e governança (não-negociável)
+## 7. Sistemas internos existentes — integrar e fortalecer
+
+A setup.com.br já desenvolveu, de forma ágil (**vibe coding**), sistemas internos
+que sustentam a operação: **gestão de projetos**, **gestão de contratos** e a
+**área comercial**. A nova infraestrutura **não os substitui** — ela os encapsula
+como conectores MCP e os coloca no alcance dos agentes.
+
+**Integrar — viram conectores dos agentes:**
+- **Gestão de Projetos:** o agente de PMO lê/atualiza status, monta relatórios e
+  antecipa riscos.
+- **Gestão de Contratos:** o agente de Contratos gera minutas, acompanha prazos e
+  aciona renovações.
+- **Comercial:** o agente de Atendimento/SDR qualifica leads e move o funil no
+  próprio sistema comercial.
+
+**Fortalecer — a IA cuida da saúde desses sistemas:** sistemas nascidos em vibe
+coding entregam valor rápido, mas tendem a acumular dívida técnica. O agente de
+DevOps ajuda a estabilizá-los (testes, revisão de alterações, documentação),
+reduzindo retrabalho e aumentando a confiabilidade. O investimento já feito é
+**preservado e ampliado, não descartado**.
+
+---
+
+## 8. Pessoas no centro — clima, segurança psicológica e condições de trabalho
+
+Tecnologia só compensa se melhora a vida de quem trabalha. O maior efeito desta
+infraestrutura não é a automação em si, mas o que ela faz pelas pessoas: tira o
+trabalho repetitivo e penoso e devolve **tempo, energia e tranquilidade**.
+
+**Melhores condições de trabalho:**
+- **Menos trabalho braçal:** a IA assume triagem de e-mail, atualização de status
+  e montagem de documentos — menos sobrecarga e menos horas extras.
+- **Flexibilidade:** o mesmo assistente no WhatsApp e no celular reduz fricção e
+  apoia o equilíbrio entre vida e trabalho.
+- **Apoio constante:** um mentor sempre disponível nivela o jogo — juniores
+  entregam com mais confiança.
+
+**Mais segurança psicológica** (ambiente em que as pessoas se sentem seguras para
+propor, pedir ajuda e errar sem medo de exposição):
+- **Tirar dúvidas sem julgamento:** dá para perguntar à IA quantas vezes for
+  preciso, sem o constrangimento de "perguntar besteira".
+- **O erro fica no rascunho:** tudo passa por rascunho revisável e aprovação
+  humana — erra-se no rascunho, não na frente do cliente.
+- **Aumenta, não vigia:** a IA aumenta as pessoas; **não** as vigia nem mede
+  desempenho individual. O controle das decisões é sempre humano.
+
+> **Efeito no clima:** equipes menos sobrecarregadas e mais confiantes colaboram
+> melhor, retêm talentos e atendem clientes com mais qualidade. A IA passa a ser
+> vista como **aliada do profissional**, não como ameaça ao seu trabalho.
+
+---
+
+## 9. Camada de dados e governança (não-negociável)
 
 - **Identidade única (SSO):** login via **Google Workspace corporativo**. Cada
   agente age *como* o usuário, herdando suas permissões — nunca mais do que o
@@ -185,7 +238,7 @@ e consolida o resultado.
 
 ---
 
-## 8. Como isto se conecta ao que já existe no repositório
+## 10. Como isto se conecta ao que já existe no repositório
 
 | Componente da infraestrutura | Onde está no repo |
 |---|---|
@@ -203,37 +256,42 @@ agentes, memória de longo prazo (RAG) e a camada de governança/SSO**.
 
 ---
 
-## 9. Roadmap de implantação (faseado)
+## 11. Roadmap de implantação (faseado)
 
-**Fase 1 — Fundação (semanas 1–2)**
+**Fase 1 — Fundação**
 - SSO com Google Workspace; cofre de segredos.
 - Subir os MCP servers já existentes (WhatsApp, computer-use, Gmail, Calendar,
   Drive, GitHub) em ambiente corporativo.
 
-**Fase 2 — Primeiros agentes (semanas 3–5)**
-- Assistente Executivo (Gmail+Calendar+Drive) e Atendimento (WhatsApp).
-- Harness loop com aprovação humana para ações externas.
+**Fase 2 — Conectar o que já existe**
+- Expor gestão de projetos, contratos e comercial como conectores MCP.
+- Assistente Executivo e Atendimento; harness loop com aprovação humana.
 - Roteador multimodelo (Haiku→Sonnet→Opus).
 
-**Fase 3 — Conhecimento e escala (semanas 6–9)**
+**Fase 3 — Agentes + conhecimento**
 - Base vetorial (RAG) sobre documentos do Drive.
-- Agentes de Documentos, Financeiro, Suporte/DevOps.
+- Agentes de PMO, Contratos, Financeiro, Suporte/DevOps.
 - Multidispositivo (PWA mobile/tablet) com sessão contínua.
 
 **Fase 4 — Governança e otimização (contínuo)**
-- Auditoria completa, DLP, métricas de produtividade e custo por agente.
+- Auditoria completa, DLP, indicadores de produtividade, clima e custo.
 - Ajuste fino do roteamento de modelos por custo/qualidade.
 
 ---
 
-## 10. Métricas de sucesso (qualidade + produtividade)
+## 12. Framework de indicadores (medidos, não presumidos)
 
-- **Tempo poupado/profissional/semana** (e-mails triados, docs gerados).
-- **Tempo de primeira resposta** no WhatsApp/atendimento.
-- **Taxa de tarefas concluídas pelo loop sem intervenção** (autonomia).
-- **Taxa de aprovação humana** das ações sugeridas (qualidade da sugestão).
-- **Custo por tarefa** e mix de modelos (saúde do roteamento multimodelo).
-- **Incidentes de segurança/vazamento** = 0 (governança).
+Mede-se produtividade, qualidade e — em pé de igualdade — o **bem-estar das
+equipes**. Em vez de prometer números, define-se **o que acompanhar**: a linha de
+base é medida na própria operação e as metas saem dela (comparações honestas
+antes/depois, sobre dados reais).
+
+| Domínio | Exemplos de indicadores |
+|---|---|
+| **Produtividade** | Tempo poupado por pessoa · Retrabalho evitado · Tarefas automatizadas |
+| **Qualidade** | Consistência dos entregáveis · Erros e correções · Tempo de 1ª resposta |
+| **Pessoas & Clima** | Sobrecarga percebida · eNPS / satisfação · Segurança psicológica |
+| **Segurança & Governança** | Incidentes com dados · % de ações auditadas · Aderência a permissões |
 
 ---
 

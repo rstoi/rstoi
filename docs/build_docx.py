@@ -185,20 +185,22 @@ body("A setup.com.br adota uma infraestrutura de TI em que a Inteligência "
      "o contexto da empresa e executa tarefas de ponta a ponta.")
 body("O diferencial não é “conversar com um chatbot”, e sim ter agentes que "
      "operam de verdade: leem e-mails, organizam a agenda, geram documentos no "
-     "Drive, respondem clientes no WhatsApp e automatizam rotinas — sempre sob "
-     "controle humano nas decisões críticas. Para isso combinamos três pilares:")
+     "Drive, respondem clientes no WhatsApp e atuam sobre os sistemas internos já "
+     "existentes (projetos, contratos e comercial) — sempre sob controle humano "
+     "nas decisões críticas. Para isso combinamos três pilares:")
 bullet("seleciona automaticamente o modelo certo para cada tarefa, equilibrando custo, velocidade e qualidade.", "Multimodelo — ")
 bullet("o ciclo planejar → agir → observar → corrigir que faz o agente concluir o trabalho sozinho.", "Harness loop — ")
-bullet("um padrão único que conecta a IA aos sistemas reais (WhatsApp, Gmail, Calendar, Drive, GitHub).", "Conectores MCP — ")
+bullet("um padrão único que conecta a IA aos sistemas reais (WhatsApp, Google Workspace, projetos, contratos e comercial).", "Conectores MCP — ")
 
 # caixa de destaque (benefício)
 t = doc.add_table(rows=1, cols=1); no_table_borders(t)
 cell = t.rows[0].cells[0]; set_cell_bg(cell, "E6F7F6"); set_cell_margins(cell, 140, 140, 200, 200)
 p = cell.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
 add_run(p, "Resultado esperado:  ", size=11, color=INK, bold=True)
-add_run(p, "menos tempo em tarefas repetitivas, respostas mais rápidas a clientes "
-        "e mais qualidade nos entregáveis — com governança, segurança e custo "
-        "sob controle.", size=11, color=BODY)
+add_run(p, "menos tempo em tarefas repetitivas e mais qualidade nos entregáveis — "
+        "e, no mesmo movimento, equipes menos sobrecarregadas, com mais segurança "
+        "psicológica e melhores condições de trabalho, sob governança e custo "
+        "controlados.", size=11, color=BODY)
 
 add_image(f"{A}/01_camadas.png", 6.4, "Figura 1 — A infraestrutura em quatro camadas integradas.")
 
@@ -288,17 +290,18 @@ body("Em vez de um único agente genérico, a empresa mantém agentes com escopo
      "permissões definidos. Cada um usa o harness loop e o roteamento multimodelo, "
      "e pode delegar a sub-agentes em paralelo.")
 
-ag = doc.add_table(rows=7, cols=3)
+ag = doc.add_table(rows=8, cols=3)
 ag.alignment = WD_TABLE_ALIGNMENT.CENTER
 no_table_borders(ag)
 arows = [
     ("Agente", "Função", "Conectores"),
     ("Assistente Executivo", "Triagem de e-mail, agenda, resumos diários, preparo de reuniões.", "Gmail, Calendar, Drive"),
-    ("Atendimento / SDR", "Responde clientes no WhatsApp, qualifica leads, agenda demos.", "WhatsApp, Calendar, CRM"),
-    ("Operações de Documentos", "Gera e organiza propostas, contratos e relatórios; OCR de notas.", "Drive, visão/OCR"),
+    ("Atendimento / SDR", "Responde clientes no WhatsApp, qualifica leads, agenda demos.", "WhatsApp, sist. Comercial"),
+    ("PMO / Projetos", "Atualiza status, gera relatórios e antecipa riscos nos projetos.", "sist. Projetos, Drive"),
+    ("Contratos", "Gera, organiza e acompanha prazos de contratos; OCR de documentos.", "sist. Contratos, visão/OCR"),
     ("Suporte / IT Helpdesk", "Abre e resolve chamados, executa runbooks, opera máquinas.", "computer-use, ITSM"),
-    ("DevOps / Engenharia", "Revisa PRs, corrige CI, automatiza deploys.", "GitHub, computer-use"),
-    ("Financeiro", "Concilia, organiza despesas e gera relatórios a partir de notas.", "Drive, ERP"),
+    ("DevOps / Engenharia", "Revisa PRs, corrige CI, evolui os sistemas internos.", "GitHub, computer-use"),
+    ("Financeiro", "Concilia, organiza despesas e gera relatórios a partir de notas.", "sist. Contratos, ERP"),
 ]
 widths = [Inches(1.9), Inches(3.3), Inches(1.4)]
 for i, row in enumerate(arows):
@@ -317,8 +320,58 @@ for i, row in enumerate(arows):
 
 doc.add_page_break()
 
-# ============================================================ 5. GOVERNANÇA
-heading("Segurança e governança — não-negociável", "5")
+# ============================================================ 5. SISTEMAS INTERNOS
+heading("Sistemas internos existentes — integrar e fortalecer", "5")
+body("A setup.com.br já desenvolveu, de forma ágil (“vibe coding”), sistemas "
+     "internos que sustentam a operação: gestão de projetos, gestão de contratos "
+     "e a área comercial. A nova infraestrutura não os substitui — ela os "
+     "encapsula como conectores e os coloca no alcance dos agentes.")
+subheading("Integrar — esses sistemas viram conectores dos agentes")
+bullet("o agente de PMO lê e atualiza status, monta relatórios e antecipa riscos.", "Gestão de Projetos — ")
+bullet("o agente de Contratos gera minutas, acompanha prazos e aciona renovações.", "Gestão de Contratos — ")
+bullet("o agente de Atendimento/SDR qualifica leads e move o funil no próprio sistema comercial.", "Comercial — ")
+subheading("Fortalecer — a IA também cuida da saúde desses sistemas")
+body("Sistemas nascidos em vibe coding entregam valor rápido, mas tendem a "
+     "acumular dívida técnica. O agente de DevOps ajuda a estabilizá-los — "
+     "adicionando testes, revisando alterações e documentando — reduzindo "
+     "retrabalho e tornando-os mais confiáveis ao longo do tempo. O investimento "
+     "feito é preservado e ampliado, não descartado.")
+
+# ============================================================ 6. PESSOAS / CLIMA
+heading("Pessoas no centro — clima, segurança psicológica e condições de trabalho", "6")
+body("Tecnologia só compensa se melhora a vida de quem trabalha. O maior efeito "
+     "desta infraestrutura não é a automação em si, mas o que ela faz pelas "
+     "pessoas: tira de cima delas o trabalho repetitivo e penoso e devolve tempo, "
+     "energia e tranquilidade.")
+add_image(f"{A}/06_pessoas.png", 6.6, "Figura 4 — Como a infraestrutura melhora as condições de trabalho.")
+
+subheading("Melhores condições de trabalho")
+bullet("a IA assume triagem de e-mail, atualização de status e montagem de documentos, reduzindo sobrecarga e horas extras.", "Menos trabalho braçal — ")
+bullet("o mesmo assistente no WhatsApp e no celular reduz a fricção e apoia o equilíbrio entre vida e trabalho.", "Flexibilidade — ")
+bullet("um mentor sempre disponível nivela o jogo: profissionais novos ou juniores entregam com mais confiança.", "Apoio constante — ")
+
+subheading("Mais segurança psicológica")
+body("Segurança psicológica é o ambiente em que as pessoas se sentem seguras "
+     "para propor ideias, pedir ajuda e errar sem medo de exposição. A "
+     "infraestrutura reforça isso de forma concreta:")
+bullet("dá para perguntar à IA quantas vezes for preciso, sem constrangimento de “perguntar besteira”.", "Tirar dúvidas sem julgamento — ")
+bullet("como tudo passa por rascunho revisável e aprovação humana, o custo de errar cai — erra-se no rascunho, não na frente do cliente.", "O erro fica no rascunho — ")
+bullet("a IA aumenta as pessoas; ela não as vigia nem mede desempenho individual. O controle das decisões é sempre humano.", "Aumenta, não vigia — ")
+
+# caixa princípio — clima
+t = doc.add_table(rows=1, cols=1); no_table_borders(t)
+cell = t.rows[0].cells[0]; set_cell_bg(cell, "E6F7F6"); set_cell_margins(cell, 140, 140, 200, 200)
+p = cell.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
+add_run(p, "Efeito no clima:  ", size=11, color=INK, bold=True)
+add_run(p, "equipes menos sobrecarregadas e mais confiantes colaboram melhor, "
+        "retêm talentos e atendem clientes com mais qualidade. A IA passa a ser "
+        "vista como aliada do profissional — não como ameaça ao seu trabalho.",
+        size=11, color=BODY)
+
+doc.add_page_break()
+
+# ============================================================ 7. GOVERNANÇA
+heading("Segurança e governança — não-negociável", "7")
 body("A produtividade só é sustentável com confiança. A infraestrutura aplica "
      "controle por padrão:")
 bullet("login via Google Workspace corporativo; cada agente age como o usuário, herdando apenas as permissões que ele já tem.", "Identidade única (SSO) — ")
@@ -328,33 +381,32 @@ bullet("chaves e tokens em cofre (Vault / Secret Manager), nunca no código.", "
 bullet("cada passo do loop (ferramenta, parâmetros, resultado, aprovação) é registrado para conformidade.", "Auditoria completa — ")
 bullet("dados da empresa não treinam modelos públicos; ambientes com garantia de não retenção.", "Isolamento de dados — ")
 
-# ============================================================ 6. BASE EXISTENTE
-heading("O que já existe e o que falta construir", "6")
-body("Boa parte da camada de ferramentas já está implementada no ambiente atual "
-     "da setup.com.br, o que reduz o tempo de implantação:")
+# ============================================================ 8. BASE EXISTENTE
+heading("O que já existe e o que falta construir", "8")
+body("Boa parte da fundação já está no ambiente atual da setup.com.br, o que "
+     "reduz o tempo e o risco de implantação:")
 subheading("Já disponível")
 bullet("conector de WhatsApp (número pessoal via automação de navegador e API oficial para produção).", "WhatsApp — ")
 bullet("Gmail, Calendar e Drive já integrados como conectores MCP.", "Google Workspace — ")
+bullet("gestão de projetos, contratos e comercial, prontos para serem expostos como conectores.", "Sistemas internos — ")
 bullet("capacidade de operar o computador e integração com GitHub para as equipes técnicas.", "computer-use e GitHub — ")
 subheading("A construir")
 bullet("roteador multimodelo, catálogo de agentes, memória de longo prazo (base de conhecimento) e a camada de governança/SSO corporativa.", "")
 
-# ============================================================ 7. ROADMAP
-heading("Roadmap de implantação", "7")
-add_image(f"{A}/04_roadmap.png", 6.6, "Figura 4 — Implantação faseada, do alicerce à otimização contínua.")
+# ============================================================ 9. ROADMAP
+heading("Roadmap de implantação", "9")
+add_image(f"{A}/04_roadmap.png", 6.6, "Figura 5 — Implantação faseada, do alicerce à otimização contínua.")
 
 doc.add_page_break()
 
-# ============================================================ 8. IMPACTO / KPIs
-heading("Impacto esperado e indicadores", "8")
-body("O sucesso é medido por produtividade e qualidade, não por adoção de "
-     "tecnologia. Principais indicadores acompanhados:")
-add_image(f"{A}/05_kpis.png", 6.2, "Figura 5 — Metas de impacto frente à linha de base atual.")
-bullet("tempo poupado por profissional/semana (e-mails triados, documentos gerados).", "Produtividade — ")
-bullet("tempo de primeira resposta no WhatsApp e no atendimento.", "Agilidade — ")
-bullet("taxa de tarefas concluídas pelo loop sem intervenção.", "Autonomia — ")
-bullet("taxa de aprovação humana das ações sugeridas e custo por tarefa.", "Qualidade e custo — ")
-bullet("zero incidentes de vazamento de dados.", "Segurança — ")
+# ============================================================ 10. INDICADORES
+heading("Indicadores de acompanhamento", "10")
+body("O sucesso é medido por produtividade, qualidade e — em pé de igualdade — "
+     "pelo bem-estar das equipes. Em vez de prometer números, definimos o que "
+     "acompanhar: a linha de base é medida na própria operação e as metas saem "
+     "dela. Assim evitamos projeções artificiais e ganhamos comparações honestas "
+     "(antes e depois) sobre dados reais da setup.com.br.")
+add_image(f"{A}/05_indicadores.png", 6.4, "Figura 6 — Domínios de indicadores; valores definidos a partir da medição inicial.")
 
 # fechamento
 sp = doc.add_paragraph(); sp.paragraph_format.space_before = Pt(10)
