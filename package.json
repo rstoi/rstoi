@@ -18,7 +18,8 @@
     "setup:chrome": "bash scripts/install-chrome.sh",
     "connect": "tsx scripts/wa-connect.ts",
     "personal": "WA_ADAPTER=playwright tsx src/index.ts",
-    "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts"
+    "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts",
+    "mcp:smoke": "node scripts/mcp-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
