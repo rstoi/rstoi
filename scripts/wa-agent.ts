@@ -32,6 +32,22 @@ const MAX_REPLY_LEN = 3800;
 const AGENT_GROUPS = parseCsv(process.env.WA_AGENT_GROUPS);          // grupos onde responde
 const ALLOWED_SENDERS = parseCsv(process.env.WA_AGENT_ALLOWED_SENDERS); // quem pode disparar
 
+const HELP_TEXT = [
+  "🛠️ *Agente Setup — comandos aceitos no WhatsApp*",
+  "",
+  "Use: */setup <pedido>* — eu interpreto e executo no projeto, e respondo o resultado.",
+  "",
+  "*Exemplos:*",
+  "• */setup status do projeto*",
+  "• */setup rode os testes*",
+  "• */setup como está o git*",
+  "• */setup faça o build e diga se passou*",
+  "• */setup* (sozinho) → status do projeto",
+  "• */setup ajuda* → mostra esta ajuda",
+  "",
+  "ℹ️ Funciona apenas nos grupos autorizados e para membros deles.",
+].join("\n");
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ── Tool execution ────────────────────────────────────────────────────────────
@@ -146,6 +162,12 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
 
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";
   console.error(`[agent] /setup de ${msg.fromId} (${groupName || msg.chatId}): ${command}`);
+
+  // Ajuda: lista os comandos aceitos sem executar nada.
+  if (/^(ajuda|help|\?|comandos)$/i.test(command)) {
+    await adapter.sendMessage(msg.chatId, { text: HELP_TEXT }).catch(() => {});
+    return;
+  }
 
   // Acknowledge
   try {
