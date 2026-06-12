@@ -11,16 +11,20 @@ from PIL import Image
 A = "/home/user/rstoi/docs/assets"
 OUT = "/home/user/rstoi/docs/Infraestrutura-IA-setup.com.br.pptx"
 
-INK   = RGBColor(0x0F, 0x27, 0x40)
-BLUE  = RGBColor(0x1F, 0x6F, 0xEB)
-TEAL  = RGBColor(0x0F, 0xB5, 0xAE)
-AMBER = RGBColor(0xF5, 0xA6, 0x23)
-GREEN = RGBColor(0x2E, 0x8B, 0x57)
-SLATE = RGBColor(0x5B, 0x6B, 0x7B)
+# Paleta extraída do logo oficial setup.com.br
+INK   = RGBColor(0x00, 0x3C, 0x54)   # petróleo escuro ("set")
+BLUE  = RGBColor(0x0E, 0x6E, 0x92)   # azul setup (primário)
+TEAL  = RGBColor(0x1F, 0x97, 0xB4)   # teal do swoosh
+AMBER = RGBColor(0x4E, 0x86, 0xAE)   # azul aço médio (4º tom)
+GREEN = RGBColor(0x00, 0x3C, 0x54)   # (substituído por petróleo)
+STEEL = RGBColor(0x60, 0x9C, 0xC0)   # azul aço claro
+SLATE = RGBColor(0x5E, 0x6A, 0x72)
 BODY  = RGBColor(0x21, 0x2B, 0x36)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-LIGHT = RGBColor(0xEA, 0xF2, 0xFB)
-PALE  = RGBColor(0xF2, 0xF5, 0xF8)
+LIGHT = RGBColor(0xE4, 0xEE, 0xF4)
+PALE  = RGBColor(0xF1, 0xF4, 0xF6)
+LOGO       = f"{A}/setup_logo@hi.png"
+LOGO_WHITE = f"{A}/setup_logo_white@hi.png"
 
 prs = Presentation()
 prs.slide_width = Inches(13.333)
@@ -87,9 +91,9 @@ def R(t, size, color=BODY, bold=False, italic=False, font=FONT):
 
 
 def footer(s, page):
-    txt(s, Inches(0.55), Inches(7.06), Inches(9), Inches(0.3),
-        [[R("setup.com.br  ·  Infraestrutura de TI com IA  ·  Documento Executivo",
-            9, SLATE)]])
+    s.shapes.add_picture(LOGO, Inches(0.55), Inches(7.02), height=Inches(0.22))
+    txt(s, Inches(1.7), Inches(7.06), Inches(9), Inches(0.3),
+        [[R("Infraestrutura de TI com IA  ·  Documento Executivo", 9, SLATE)]])
     txt(s, Inches(11.8), Inches(7.06), Inches(1.0), Inches(0.3),
         [[R(str(page), 9, SLATE, bold=True)]], align=PP_ALIGN.RIGHT)
 
@@ -145,21 +149,21 @@ def bullets(s, items, x_in, y_in, w_in, size=16, gap=10, accent=BLUE):
 # ============================================================ 1 · CAPA
 s = slide()
 rect(s, 0, 0, SW, SH, INK)
-for i, c in enumerate([BLUE, TEAL, AMBER]):
+for i, c in enumerate([BLUE, TEAL, STEEL]):
     rect(s, Inches(0.3 + i * 0.22), 0, Inches(0.16), SH, c)
-txt(s, Inches(1.1), Inches(2.0), Inches(11), Inches(0.5),
-    [[R("setup.com.br", 22, TEAL, bold=True)]])
+# logo oficial (versão branca)
+s.shapes.add_picture(LOGO_WHITE, Inches(1.1), Inches(1.7), height=Inches(0.62))
 txt(s, Inches(1.1), Inches(2.7), Inches(11.4), Inches(1.6),
     [[R("Infraestrutura de TI com IA", 48, WHITE, bold=True)]])
 txt(s, Inches(1.12), Inches(4.3), Inches(11), Inches(0.6),
     [[R("Produtividade aumentada por agentes, multimodelo e harness loop",
-        18, RGBColor(0xAF, 0xC6, 0xE0))]])
+        18, STEEL)]])
 txt(s, Inches(1.12), Inches(5.0), Inches(11), Inches(0.6),
     [[R("Integração: PC · Notebook · Tablet · Smartphone · WhatsApp · Google Workspace",
-        13, RGBColor(0x8F, 0xA8, 0xC4), italic=True)]])
+        13, STEEL, italic=True)]])
 txt(s, Inches(1.1), Inches(6.5), Inches(11), Inches(0.4),
     [[R("Documento Executivo   ·   v1.0   ·   Junho / 2026   ·   Uso interno",
-        11, RGBColor(0x6E, 0x84, 0xA0), bold=True)]])
+        11, STEEL, bold=True)]])
 
 # ============================================================ 2 · SUMÁRIO / 3 PILARES
 s = slide()
@@ -187,7 +191,7 @@ for i, (t, d, c) in enumerate(cards):
     txt(s, x + Inches(0.3), Inches(4.05), cw - Inches(0.6), Inches(1.2),
         [[R(d, 13.5, BODY)]], line_spacing=1.1)
 # faixa resultado esperado
-rrect(s, Inches(0.6), Inches(5.55), Inches(12.13), Inches(1.15), RGBColor(0xE6, 0xF7, 0xF6))
+rrect(s, Inches(0.6), Inches(5.55), Inches(12.13), Inches(1.15), RGBColor(0xE1, 0xF0, 0xF4))
 txt(s, Inches(0.95), Inches(5.78), Inches(11.6), Inches(0.8),
     [[R("Resultado esperado:  ", 14, INK, bold=True),
       R("menos tempo em tarefas repetitivas e mais qualidade nos entregáveis — e, "
@@ -247,7 +251,7 @@ bullets(s, [
     ("Agir/Observar — ", "busca histórico no Drive e Gmail, gera a proposta, agenda no Calendar."),
     ("Aprovar — ", "envia o resumo ao vendedor; se houver ajuste, o loop reabre."),
 ], 7.5, 2.1, 5.3, size=14, gap=9, accent=TEAL)
-rrect(s, Inches(7.5), Inches(5.0), Inches(5.3), Inches(1.5), RGBColor(0xFD, 0xF3, 0xE0))
+rrect(s, Inches(7.5), Inches(5.0), Inches(5.3), Inches(1.5), RGBColor(0xE8, 0xF1, 0xF8))
 txt(s, Inches(7.78), Inches(5.2), Inches(4.8), Inches(1.2),
     [[R("Controle humano:  ", 13, INK, bold=True),
       R("ações de baixo risco são automáticas; envios e alterações irreversíveis "
@@ -303,7 +307,7 @@ bullets(s, [
     ("Contratos — ", "gera minutas, acompanha prazos, renova."),
     ("Comercial — ", "qualifica leads e move o funil."),
 ], 0.95, 3.55, 5.3, size=13.5, gap=9, accent=BLUE)
-rrect(s, Inches(6.78), Inches(2.9), Inches(5.95), Inches(3.4), RGBColor(0xE6, 0xF7, 0xF6))
+rrect(s, Inches(6.78), Inches(2.9), Inches(5.95), Inches(3.4), RGBColor(0xE1, 0xF0, 0xF4))
 txt(s, Inches(7.08), Inches(3.05), Inches(5.4), Inches(0.4),
     [[R("FORTALECER  →  saúde dos sistemas", 15, TEAL, bold=True)]])
 txt(s, Inches(7.08), Inches(3.6), Inches(5.4), Inches(2.4),
@@ -357,7 +361,7 @@ footer(s, 12)
 # ============================================================ 13 · FECHAMENTO
 s = slide()
 rect(s, 0, 0, SW, SH, INK)
-for i, c in enumerate([BLUE, TEAL, AMBER]):
+for i, c in enumerate([BLUE, TEAL, STEEL]):
     rect(s, Inches(0.3 + i * 0.22), 0, Inches(0.16), SH, c)
 txt(s, Inches(1.2), Inches(2.4), Inches(11), Inches(0.6),
     [[R("EM UMA FRASE", 16, TEAL, bold=True)]])
@@ -366,9 +370,7 @@ txt(s, Inches(1.2), Inches(3.0), Inches(11), Inches(2.2),
         "operando com segurança para que cada profissional da setup.com.br "
         "entregue mais e melhor, com bem-estar.", 30, WHITE, bold=True)]],
     line_spacing=1.12)
-txt(s, Inches(1.2), Inches(6.4), Inches(11), Inches(0.5),
-    [[R("setup.com.br  ·  Infraestrutura de TI com IA", 13,
-        RGBColor(0x8F, 0xA8, 0xC4))]])
+s.shapes.add_picture(LOGO_WHITE, Inches(1.2), Inches(6.3), height=Inches(0.5))
 
 prs.save(OUT)
 print("Deck salvo em", OUT, "—", len(prs.slides._sldIdLst), "slides")

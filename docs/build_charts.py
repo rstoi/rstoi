@@ -7,16 +7,18 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 import matplotlib.font_manager as fm
 import numpy as np
 
-# Paleta corporativa
-INK    = "#0F2740"   # azul-petróleo escuro (texto/títulos)
-BLUE   = "#1F6FEB"   # azul primário
-TEAL   = "#0FB5AE"   # ciano de destaque
-AMBER  = "#F5A623"   # âmbar (atenção/humano)
-SLATE  = "#5B6B7B"   # cinza-azulado
-LIGHT  = "#EAF2FB"   # azul muito claro (fundos)
-LIGHT2 = "#E6F7F6"   # ciano claro
-GREY   = "#F2F5F8"
+# Paleta corporativa — extraída do logo oficial setup.com.br
+INK    = "#003C54"   # petróleo escuro ("set") — títulos/barras
+BLUE   = "#0E6E92"   # azul setup (primário)
+TEAL   = "#1F97B4"   # teal do swoosh (destaque)
+AMBER  = "#4E86AE"   # azul aço médio (4º tom — antes âmbar)
+SLATE  = "#5E6A72"   # cinza-azulado (texto secundário)
+LIGHT  = "#E4EEF4"   # azul muito claro (fundos)
+LIGHT2 = "#E1F0F4"   # teal claro
+GREY   = "#F1F4F6"
 WHITE  = "#FFFFFF"
+STEEL  = "#609CC0"   # azul aço claro (brilho do swoosh)
+GRAY   = "#A8A8A8"   # cinza do logo ("up" / "30 Anos")
 
 plt.rcParams["font.family"] = "DejaVu Sans"
 
@@ -193,7 +195,7 @@ def fig_indicadores():
         ("QUALIDADE", TEAL, LIGHT2,
          ["Consistência dos entregáveis", "Erros e correções",
           "Tempo de 1ª resposta"], 51, 47),
-        ("PESSOAS & CLIMA", AMBER, "#FDF3E0",
+        ("PESSOAS & CLIMA", AMBER, "#EAF1F8",
          ["Sobrecarga percebida", "eNPS / satisfação",
           "Segurança psicológica"], 6, 9),
         ("SEGURANÇA & GOVERNANÇA", INK, "#E8ECF1",
@@ -229,7 +231,7 @@ def fig_pessoas():
         ("IA assume\no repetitivo", "Triagem, status de\nprojetos, documentos", BLUE, 13.5),
         ("Libera tempo\ne energia", "Foco no que é\ncriativo e humano", TEAL, 37.8),
         ("Menos sobrecarga\ne menos erro", "Rascunho revisável\nantes de agir", AMBER, 62.2),
-        ("Mais clima e\nseg. psicológica", "Confiança para\npropor e pedir ajuda", "#2E8B57", 86.5),
+        ("Mais clima e\nseg. psicológica", "Confiança para\npropor e pedir ajuda", INK, 86.5),
     ]
     bw = 21
     for i, (title, desc, c, x) in enumerate(steps):
@@ -264,16 +266,23 @@ def fig_pessoas():
 # Banner de capa
 # ---------------------------------------------------------------------------
 def fig_capa():
+    import matplotlib.image as mpimg
     fig, ax = plt.subplots(figsize=(9.5, 3.0), dpi=200)
     ax.set_xlim(0, 100); ax.set_ylim(0, 100); ax.axis("off")
     rounded(ax, 0, 0, 100, 100, INK, r=0.0)
-    # acento geométrico
-    for i, c in enumerate([BLUE, TEAL, AMBER]):
+    # acento geométrico (faixas do swoosh)
+    for i, c in enumerate([BLUE, TEAL, STEEL]):
         rounded(ax, 2 + i * 1.6, 0, 1.2, 100, c, r=0.0)
-    text(ax, 8, 66, "setup.com.br", 13, TEAL, "bold", ha="left")
+    # logo oficial (versão branca) no topo
+    logo = mpimg.imread(f"{A}/setup_logo_white@hi.png")
+    lh, lw = logo.shape[0], logo.shape[1]
+    ar = lw / lh
+    box_h = 16            # altura em unidades do eixo
+    box_w = box_h * ar
+    ax.imshow(logo, extent=(8, 8 + box_w, 70, 70 + box_h), zorder=4, aspect="auto")
     text(ax, 8, 45, "Infraestrutura de TI com IA", 24, WHITE, "bold", ha="left")
     text(ax, 8, 25, "Produtividade aumentada por agentes, multimodelo e harness loop",
-         11.5, "#AFC6E0", "normal", ha="left")
+         11.5, STEEL, "normal", ha="left")
     fig.savefig(f"{A}/00_capa.png", bbox_inches="tight", facecolor=WHITE, pad_inches=0)
     plt.close(fig)
 

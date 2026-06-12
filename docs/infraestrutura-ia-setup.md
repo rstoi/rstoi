@@ -1,3 +1,5 @@
+<img src="assets/setup_logo@hi.png" alt="setup.com.br" height="48">
+
 # Infraestrutura de TI com IA — setup.com.br
 
 > Arquitetura de produtividade aumentada por IA para os profissionais da

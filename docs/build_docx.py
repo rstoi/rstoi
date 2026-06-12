@@ -11,11 +11,13 @@ from docx.oxml import OxmlElement
 A = "/home/user/rstoi/docs/assets"
 OUT = "/home/user/rstoi/docs/Infraestrutura-IA-setup.com.br.docx"
 
-INK   = RGBColor(0x0F, 0x27, 0x40)
-BLUE  = RGBColor(0x1F, 0x6F, 0xEB)
-TEAL  = RGBColor(0x0F, 0xB5, 0xAE)
-AMBER = RGBColor(0xF5, 0xA6, 0x23)
-SLATE = RGBColor(0x5B, 0x6B, 0x7B)
+# Paleta extraída do logo oficial setup.com.br
+INK   = RGBColor(0x00, 0x3C, 0x54)   # petróleo escuro ("set")
+BLUE  = RGBColor(0x0E, 0x6E, 0x92)   # azul setup (primário)
+TEAL  = RGBColor(0x1F, 0x97, 0xB4)   # teal do swoosh
+AMBER = RGBColor(0x4E, 0x86, 0xAE)   # azul aço médio (4º tom)
+STEEL = RGBColor(0x60, 0x9C, 0xC0)   # azul aço claro
+SLATE = RGBColor(0x5E, 0x6A, 0x72)   # cinza-azulado (texto secundário)
 BODY  = RGBColor(0x21, 0x2B, 0x36)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
@@ -99,7 +101,7 @@ def heading(text, num=None):
     bottom.set(qn("w:val"), "single")
     bottom.set(qn("w:sz"), "6")
     bottom.set(qn("w:space"), "4")
-    bottom.set(qn("w:color"), "D8E2EC")
+    bottom.set(qn("w:color"), "D2E2EC")
     pbdr.append(bottom)
     pPr.append(pbdr)
     return p
@@ -166,7 +168,7 @@ meta.alignment = WD_TABLE_ALIGNMENT.CENTER
 no_table_borders(meta)
 items = [("VERSÃO", "1.0"), ("DATA", "Junho / 2026"), ("CLASSIFICAÇÃO", "Uso interno")]
 for cell, (k, v) in zip(meta.rows[0].cells, items):
-    set_cell_bg(cell, "EAF2FB")
+    set_cell_bg(cell, "E4EEF4")
     set_cell_margins(cell)
     cell.width = Inches(2.2)
     p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -194,7 +196,7 @@ bullet("um padrão único que conecta a IA aos sistemas reais (WhatsApp, Google 
 
 # caixa de destaque (benefício)
 t = doc.add_table(rows=1, cols=1); no_table_borders(t)
-cell = t.rows[0].cells[0]; set_cell_bg(cell, "E6F7F6"); set_cell_margins(cell, 140, 140, 200, 200)
+cell = t.rows[0].cells[0]; set_cell_bg(cell, "E1F0F4"); set_cell_margins(cell, 140, 140, 200, 200)
 p = cell.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
 add_run(p, "Resultado esperado:  ", size=11, color=INK, bold=True)
 add_run(p, "menos tempo em tarefas repetitivas e mais qualidade nos entregáveis — "
@@ -230,12 +232,12 @@ for i, (a_, b_) in enumerate(rows):
     c0.width = Inches(1.7); c1.width = Inches(4.9)
     set_cell_margins(c0); set_cell_margins(c1)
     if i == 0:
-        set_cell_bg(c0, "0F2740"); set_cell_bg(c1, "0F2740")
+        set_cell_bg(c0, "003C54"); set_cell_bg(c1, "003C54")
         for cc, tx in ((c0, a_), (c1, b_)):
             p = cc.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
             add_run(p, tx, size=10.5, color=WHITE, bold=True)
     else:
-        bg = "F2F5F8" if i % 2 else "FFFFFF"
+        bg = "F1F4F6" if i % 2 else "FFFFFF"
         set_cell_bg(c0, bg); set_cell_bg(c1, bg)
         p = c0.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
         add_run(p, a_, size=10.5, color=BLUE, bold=True)
@@ -276,7 +278,7 @@ body("Tudo isso sem o profissional sair do WhatsApp. O loop, os modelos e os "
 
 # caixa governança no loop
 t = doc.add_table(rows=1, cols=1); no_table_borders(t)
-cell = t.rows[0].cells[0]; set_cell_bg(cell, "FDF3E0"); set_cell_margins(cell, 140, 140, 200, 200)
+cell = t.rows[0].cells[0]; set_cell_bg(cell, "E8F1F8"); set_cell_margins(cell, 140, 140, 200, 200)
 p = cell.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
 add_run(p, "Controle humano (human-in-the-loop):  ", size=11, color=INK, bold=True)
 add_run(p, "ações de baixo risco (rascunhar, resumir, buscar) são automáticas; "
@@ -308,11 +310,11 @@ for i, row in enumerate(arows):
     for j, txt in enumerate(row):
         c = ag.rows[i].cells[j]; c.width = widths[j]; set_cell_margins(c)
         if i == 0:
-            set_cell_bg(c, "1F6FEB")
+            set_cell_bg(c, "0E6E92")
             p = c.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
             add_run(p, txt, size=10, color=WHITE, bold=True)
         else:
-            bg = "F2F5F8" if i % 2 else "FFFFFF"
+            bg = "F1F4F6" if i % 2 else "FFFFFF"
             set_cell_bg(c, bg)
             p = c.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
             add_run(p, txt, size=9.5, color=(INK if j == 0 else BODY),
@@ -360,7 +362,7 @@ bullet("a IA aumenta as pessoas; ela não as vigia nem mede desempenho individua
 
 # caixa princípio — clima
 t = doc.add_table(rows=1, cols=1); no_table_borders(t)
-cell = t.rows[0].cells[0]; set_cell_bg(cell, "E6F7F6"); set_cell_margins(cell, 140, 140, 200, 200)
+cell = t.rows[0].cells[0]; set_cell_bg(cell, "E1F0F4"); set_cell_margins(cell, 140, 140, 200, 200)
 p = cell.paragraphs[0]; p.paragraph_format.space_after = Pt(0)
 add_run(p, "Efeito no clima:  ", size=11, color=INK, bold=True)
 add_run(p, "equipes menos sobrecarregadas e mais confiantes colaboram melhor, "
@@ -411,7 +413,7 @@ add_image(f"{A}/05_indicadores.png", 6.4, "Figura 6 — Domínios de indicadores
 # fechamento
 sp = doc.add_paragraph(); sp.paragraph_format.space_before = Pt(10)
 t = doc.add_table(rows=1, cols=1); no_table_borders(t)
-cell = t.rows[0].cells[0]; set_cell_bg(cell, "0F2740"); set_cell_margins(cell, 160, 160, 220, 220)
+cell = t.rows[0].cells[0]; set_cell_bg(cell, "003C54"); set_cell_margins(cell, 160, 160, 220, 220)
 p = cell.paragraphs[0]; p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 p.paragraph_format.space_after = Pt(0)
 add_run(p, "Em uma frase:  ", size=12, color=TEAL, bold=True)
@@ -419,11 +421,17 @@ add_run(p, "um cérebro de IA, muitos corpos — a mesma inteligência em cada t
         "operando com segurança para que cada profissional da setup.com.br "
         "entregue mais e melhor.", size=12, color=WHITE, bold=True)
 
-# ---- rodapé com paginação ----
+# ---- rodapé com logo + paginação ----
 def add_footer():
     for section in doc.sections:
         footer = section.footer
-        p = footer.paragraphs[0]
+        # logo da marca (alinhado à esquerda, parágrafo próprio)
+        lp = footer.paragraphs[0]
+        lp.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        lp.paragraph_format.space_after = Pt(0)
+        lp.add_run().add_picture(f"{A}/setup_logo@hi.png", height=Inches(0.16))
+        # linha de texto + número de página
+        p = footer.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         add_run(p, "setup.com.br · Infraestrutura de TI com IA · Documento Executivo · ",
                 size=8, color=SLATE)
