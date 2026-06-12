@@ -14,16 +14,17 @@ import os; os.makedirs(OUTDIR, exist_ok=True)
 
 prs = Presentation(SRC)
 SW = prs.slide_width; SH = prs.slide_height
-PXW = 1280
+PXW = int(sys.argv[3]) if len(sys.argv) > 3 else 1280
 SCALE = PXW / SW
 PXH = int(SH * SCALE)
 
 FREG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FBLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+PT_TO_PX = 12700 * SCALE   # 1pt = 12700 EMU; escala junto com a resolução
 _cache = {}
 def font(pt, bold=False, italic=False):
     # itálico real indisponível (só regular/bold); usa o peso correspondente
-    px = max(8, int(round(pt * 1.333)))
+    px = max(8, int(round(pt * PT_TO_PX)))
     key = (px, bold)
     if key not in _cache:
         _cache[key] = ImageFont.truetype(FBLD if bold else FREG, px)
@@ -89,7 +90,7 @@ def draw_textframe(draw, shape, x, y, w, h):
         line = []; lw = 0; maxsz = 12
         def flush():
             nonlocal line, lw, maxsz
-            if line: vis.append((line, align, int(maxsz*1.333*1.25)))
+            if line: vis.append((line, align, int(maxsz*PT_TO_PX*1.28)))
             line=[]; lw=0; maxsz=12
         for (txt, sz, col, bold, ital) in runs:
             fnt = font(sz, bold, ital)

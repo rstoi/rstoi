@@ -91,9 +91,9 @@ def R(t, size, color=BODY, bold=False, italic=False, font=FONT):
 
 
 def footer(s, page):
-    s.shapes.add_picture(LOGO, Inches(0.55), Inches(7.02), height=Inches(0.22))
-    txt(s, Inches(1.7), Inches(7.06), Inches(9), Inches(0.3),
-        [[R("Infraestrutura de TI com IA  ·  Documento Executivo", 9, SLATE)]])
+    s.shapes.add_picture(LOGO, Inches(0.55), Inches(7.04), height=Inches(0.2))
+    txt(s, Inches(1.55), Inches(7.06), Inches(9.5), Inches(0.3),
+        [[R("·  Infraestrutura de TI com IA  ·  Documento Executivo", 9, SLATE)]])
     txt(s, Inches(11.8), Inches(7.06), Inches(1.0), Inches(0.3),
         [[R(str(page), 9, SLATE, bold=True)]], align=PP_ALIGN.RIGHT)
 
