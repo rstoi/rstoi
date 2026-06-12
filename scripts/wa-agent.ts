@@ -18,7 +18,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import { PlaywrightClient } from "../src/adapters/playwright/client.js";
 import { guardAdapter } from "../src/guard.js";
-import { parseCsv, isSenderAllowed, isGroupInScope } from "../src/agent-auth.js";
+import { parseCsv, isAuthorized } from "../src/agent-auth.js";
 import { closeDb } from "../src/store/db.js";
 import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
@@ -133,20 +133,15 @@ Se o comando for ambíguo, execute o que faz mais sentido e explique brevemente 
 // ── Message handler ───────────────────────────────────────────────────────────
 
 async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
-  // 1) Escopo de grupos: só responde nos grupos configurados (resolve o nome).
+  // Autorização (deny por padrão): aceita /setup de membros de um grupo
+  // escopado (WA_AGENT_GROUPS) ou de um remetente explicitamente autorizado.
   let groupName = "";
   if (msg.isGroup && typeof msg.chatId === "string" && msg.chatId.endsWith("@g.us")) {
     try { groupName = (await adapter.getGroup(msg.chatId))?.name ?? ""; } catch { /* best-effort */ }
   }
-  if (!isGroupInScope(msg.chatId, groupName, AGENT_GROUPS)) {
-    console.error(`[agent] ignorado (fora do escopo): ${groupName || msg.chatId}`);
-    return;
-  }
-
-  // 2) Autorização do remetente — negar por padrão (sem allowlist => ninguém).
-  if (!isSenderAllowed(msg.fromId, ALLOWED_SENDERS)) {
-    console.error(`[agent] negado (remetente não autorizado): ${msg.fromId}`);
-    return; // silencioso: não interage com quem não está autorizado
+  if (!isAuthorized({ chatId: msg.chatId, groupName, fromId: msg.fromId, groups: AGENT_GROUPS, senders: ALLOWED_SENDERS })) {
+    console.error(`[agent] negado (fora do escopo/não autorizado): ${groupName || msg.chatId} / ${msg.fromId}`);
+    return; // silencioso
   }
 
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";

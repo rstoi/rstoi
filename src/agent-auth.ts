@@ -27,19 +27,37 @@ export function isSenderAllowed(fromId: string | undefined, allowed: string[]): 
 }
 
 /**
- * Restringe a quais grupos o agente responde. Escopo vazio => qualquer chat
- * (comportamento padrão). Casa por nome do grupo (resolvido pelo chamador) ou
- * pelo JID, sem distinção de maiúsc./minúsc.
+ * Verifica se o chat está em um dos grupos do escopo. Casa por nome do grupo
+ * (resolvido pelo chamador) ou pelo JID, sem distinção de maiúsc./minúsc.
+ * Escopo vazio => false (nenhum grupo confiável definido).
  */
 export function isGroupInScope(
   chatId: string | undefined,
   groupName: string | undefined,
   scope: string[],
 ): boolean {
-  if (scope.length === 0) return true;
+  if (scope.length === 0) return false;
   const hay = [chatId ?? "", groupName ?? ""].map((s) => s.toLowerCase());
   return scope.some((g) => {
     const gl = g.toLowerCase();
     return hay.some((h) => h.length > 0 && h.includes(gl));
   });
+}
+
+/**
+ * Decisão final de autorização do /setup (deny por padrão):
+ *  - autorizado se a mensagem vem de um grupo escopado (membros confiáveis), OU
+ *  - se o remetente está na allowlist explícita de números.
+ * Sem grupos e sem remetentes configurados => nega tudo (nunca RCE aberta).
+ */
+export function isAuthorized(opts: {
+  chatId?: string;
+  groupName?: string;
+  fromId?: string;
+  groups: string[];
+  senders: string[];
+}): boolean {
+  if (isGroupInScope(opts.chatId, opts.groupName, opts.groups)) return true;
+  if (isSenderAllowed(opts.fromId, opts.senders)) return true;
+  return false;
 }
