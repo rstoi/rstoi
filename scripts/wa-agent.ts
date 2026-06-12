@@ -17,7 +17,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import { PlaywrightClient } from "../src/adapters/playwright/client.js";
+import { guardAdapter } from "../src/guard.js";
 import { closeDb } from "../src/store/db.js";
+import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
 
 const PROJECT_DIR = process.env.PROJECT_DIR ?? "/home/user/rstoi";
@@ -125,7 +127,7 @@ Se o comando for ambíguo, execute o que faz mais sentido e explique brevemente 
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
-async function handleMessage(adapter: PlaywrightClient, msg: Message): Promise<void> {
+async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";
   console.error(`[agent] /setup de ${msg.fromId}: ${command}`);
 
@@ -164,7 +166,10 @@ async function main() {
     process.exit(1);
   }
 
-  const adapter = new PlaywrightClient();
+  // Envolve o cliente no guard: o agente NÃO processa nem responde mensagens de
+  // grupos bloqueados (WA_BLOCKED_GROUPS, ex.: financasfacil). O onMessage
+  // recebido já vem filtrado e o sendMessage de resposta também é barrado.
+  const adapter = guardAdapter(new PlaywrightClient());
   const startedAt = Date.now();
 
   // onMessage is called for every new incoming message scraped from WhatsApp Web
