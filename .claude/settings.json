@@ -1,4 +1,5 @@
 {
+  "enabledMcpjsonServers": ["whatsapp-business", "computer-use"],
   "hooks": {
     "SessionStart": [
       {
