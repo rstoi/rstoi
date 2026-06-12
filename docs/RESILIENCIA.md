@@ -44,6 +44,19 @@ commitados. Devem ser providos pela plataforma ou refeitos:
 | **Login do WhatsApp** (`data/wa-session`, QR) | Re-autenticação interativa: `npm run connect` e escanear o QR (WhatsApp → Aparelhos conectados). Auth interativa não é persistível com segurança no repo. |
 | **Banco SQLite** (`data/*.db`) | Recriado pelos agentes na primeira execução. Histórico não persiste entre reboots a menos que armazenado externamente. |
 
+## Guardrail de chats/grupos bloqueados
+
+Os agentes **não monitoram nem interagem** com chats/grupos listados em
+`WA_BLOCKED_GROUPS` (nomes ou JIDs, separados por vírgula). Hoje:
+`WA_BLOCKED_GROUPS=financasfacil`.
+
+- Definido no `.mcp.json` (versionado) → **resiliente a reboot**.
+- Aplicado de forma centralizada em `src/guard.ts` (envolve o adaptador):
+  bloqueia enviar/editar/apagar/reagir/ler/gerenciar o grupo, **filtra-o das
+  listagens** (`list_groups`, `list_conversations`), descarta mensagens
+  recebidas dele (`onMessage`) e exclui-o de `search_messages`.
+- Para bloquear outro grupo, acrescente o nome/JID à variável (vírgula).
+
 ## Verificação rápida pós-reboot
 
 ```bash

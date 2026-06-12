@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WhatsAppAdapter } from "../adapters/base.js";
 import { getDb } from "../store/db.js";
+import { getBlockedChatIds } from "../guard.js";
 
 export function registerMessagingTools(server: McpServer, adapter: WhatsAppAdapter): void {
   server.tool(
@@ -165,7 +166,12 @@ export function registerMessagingTools(server: McpServer, adapter: WhatsAppAdapt
             WHERE messages_fts MATCH ?
             ORDER BY m.timestamp DESC LIMIT ?
           `).all(query, limit);
-      return { content: [{ type: "text" as const, text: JSON.stringify(rows) }] };
+      // Não devolve mensagens de chats/grupos bloqueados (WA_BLOCKED_GROUPS).
+      const blockedIds = getBlockedChatIds(db);
+      const visible = blockedIds.size
+        ? (rows as Array<{ chat_id?: string }>).filter((r) => !r.chat_id || !blockedIds.has(r.chat_id))
+        : rows;
+      return { content: [{ type: "text" as const, text: JSON.stringify(visible) }] };
     },
   );
 
