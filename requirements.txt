@@ -1,0 +1,5 @@
+# Dependências Python para geração dos documentos executivos (docs/build_*.py, render_pptx.py)
+python-docx>=1.1
+matplotlib>=3.8
+python-pptx>=0.6
+Pillow>=10

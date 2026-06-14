@@ -17,13 +17,36 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import { PlaywrightClient } from "../src/adapters/playwright/client.js";
+import { guardAdapter } from "../src/guard.js";
+import { parseCsv, isAuthorized } from "../src/agent-auth.js";
 import { closeDb } from "../src/store/db.js";
+import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
 
 const PROJECT_DIR = process.env.PROJECT_DIR ?? "/home/user/rstoi";
 const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-4-8";
 const CMD_PREFIX = "/setup";
 const MAX_REPLY_LEN = 3800;
+
+// Controles de segurança do /setup (RCE) — ver src/agent-auth.ts.
+const AGENT_GROUPS = parseCsv(process.env.WA_AGENT_GROUPS);          // grupos onde responde
+const ALLOWED_SENDERS = parseCsv(process.env.WA_AGENT_ALLOWED_SENDERS); // quem pode disparar
+
+const HELP_TEXT = [
+  "🛠️ *Agente Setup — comandos aceitos no WhatsApp*",
+  "",
+  "Use: */setup <pedido>* — eu interpreto e executo no projeto, e respondo o resultado.",
+  "",
+  "*Exemplos:*",
+  "• */setup status do projeto*",
+  "• */setup rode os testes*",
+  "• */setup como está o git*",
+  "• */setup faça o build e diga se passou*",
+  "• */setup* (sozinho) → status do projeto",
+  "• */setup ajuda* → mostra esta ajuda",
+  "",
+  "ℹ️ Funciona apenas nos grupos autorizados e para membros deles.",
+].join("\n");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -125,9 +148,26 @@ Se o comando for ambíguo, execute o que faz mais sentido e explique brevemente 
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
-async function handleMessage(adapter: PlaywrightClient, msg: Message): Promise<void> {
+async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
+  // Autorização (deny por padrão): aceita /setup de membros de um grupo
+  // escopado (WA_AGENT_GROUPS) ou de um remetente explicitamente autorizado.
+  let groupName = "";
+  if (msg.isGroup && typeof msg.chatId === "string" && msg.chatId.endsWith("@g.us")) {
+    try { groupName = (await adapter.getGroup(msg.chatId))?.name ?? ""; } catch { /* best-effort */ }
+  }
+  if (!isAuthorized({ chatId: msg.chatId, groupName, fromId: msg.fromId, groups: AGENT_GROUPS, senders: ALLOWED_SENDERS })) {
+    console.error(`[agent] negado (fora do escopo/não autorizado): ${groupName || msg.chatId} / ${msg.fromId}`);
+    return; // silencioso
+  }
+
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";
-  console.error(`[agent] /setup de ${msg.fromId}: ${command}`);
+  console.error(`[agent] /setup de ${msg.fromId} (${groupName || msg.chatId}): ${command}`);
+
+  // Ajuda: lista os comandos aceitos sem executar nada.
+  if (/^(ajuda|help|\?|comandos)$/i.test(command)) {
+    await adapter.sendMessage(msg.chatId, { text: HELP_TEXT }).catch(() => {});
+    return;
+  }
 
   // Acknowledge
   try {
@@ -164,7 +204,10 @@ async function main() {
     process.exit(1);
   }
 
-  const adapter = new PlaywrightClient();
+  // Envolve o cliente no guard: o agente NÃO processa nem responde mensagens de
+  // grupos bloqueados (WA_BLOCKED_GROUPS, ex.: financasfacil). O onMessage
+  // recebido já vem filtrado e o sendMessage de resposta também é barrado.
+  const adapter = guardAdapter(new PlaywrightClient());
   const startedAt = Date.now();
 
   // onMessage is called for every new incoming message scraped from WhatsApp Web

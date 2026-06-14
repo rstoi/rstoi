@@ -6,8 +6,13 @@ import { registerAllTools } from "./tools/index.js";
 import { registerAllResources } from "./resources/index.js";
 import { registerAllPrompts } from "./prompts/index.js";
 import { createWebhookServer } from "./webhook.js";
+import { guardAdapter } from "./guard.js";
 
 export function createMcpServer(adapter: WhatsAppAdapter): McpServer {
+  // Aplica o guardrail de chats/grupos bloqueados (WA_BLOCKED_GROUPS):
+  // nenhum tool/resource consegue monitorar ou interagir com eles.
+  adapter = guardAdapter(adapter);
+
   const server = new McpServer({
     name: "whatsapp-business-mcp",
     version: "1.0.0",
@@ -23,9 +28,11 @@ export function createMcpServer(adapter: WhatsAppAdapter): McpServer {
 export async function startServer(adapter: WhatsAppAdapter): Promise<void> {
   const mcpServer = createMcpServer(adapter);
 
-  // Start webhook server — both adapters receive inbound messages via HTTP webhook
+  // Start webhook server — both adapters receive inbound messages via HTTP webhook.
+  // Guarda o adaptador também aqui para que o monitoramento (onMessage) ignore
+  // os grupos bloqueados (WA_BLOCKED_GROUPS).
   if (config.adapter === "cloud-api" || config.adapter === "http") {
-    const app = createWebhookServer(adapter);
+    const app = createWebhookServer(guardAdapter(adapter));
     const srv = app.listen(config.webhookPort, () => {
       console.error(`[Webhook] Listening on port ${config.webhookPort}`);
     });
