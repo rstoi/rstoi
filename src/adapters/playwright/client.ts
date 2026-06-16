@@ -14,6 +14,8 @@
  *   WA_HEADLESS       — "false" to show browser window (default: true)
  *   WA_QR_PATH        — path to save QR code PNG (default: ./data/qr.png)
  *   WA_CHROMIUM_PATH  — path to Chromium executable (auto-detected if not set)
+ *   WA_IGNORE_HTTPS_ERRORS — "true" to skip TLS cert validation (needed behind
+ *                            TLS-intercepting proxies; default false)
  */
 
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
@@ -42,13 +44,15 @@ export class PlaywrightClient extends WhatsAppAdapter {
   private headless:       boolean;
   private qrPath:         string;
   private executablePath: string | undefined;
+  private ignoreHTTPSErrors: boolean;
 
   constructor() {
     super();
-    this.sessionDir     = resolve(process.env.WA_SESSION_DIR ?? "./data/wa-session");
-    this.headless       = process.env.WA_HEADLESS !== "false";
-    this.qrPath         = resolve(process.env.WA_QR_PATH ?? "./data/qr.png");
-    this.executablePath = process.env.WA_CHROMIUM_PATH ?? this.detectChromium();
+    this.sessionDir        = resolve(process.env.WA_SESSION_DIR ?? "./data/wa-session");
+    this.headless          = process.env.WA_HEADLESS !== "false";
+    this.qrPath            = resolve(process.env.WA_QR_PATH ?? "./data/qr.png");
+    this.executablePath    = process.env.WA_CHROMIUM_PATH ?? this.detectChromium();
+    this.ignoreHTTPSErrors = process.env.WA_IGNORE_HTTPS_ERRORS === "true";
     mkdirSync(this.sessionDir, { recursive: true });
     mkdirSync(resolve("./data"), { recursive: true });
   }
@@ -88,11 +92,12 @@ export class PlaywrightClient extends WhatsAppAdapter {
     });
 
     this.context = await this.browser.newContext({
-      storageState:    hasSession ? storageFile : undefined,
-      userAgent:       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      viewport:        { width: 1280, height: 800 },
-      locale:          "pt-BR",
-      timezoneId:      "America/Sao_Paulo",
+      storageState:      hasSession ? storageFile : undefined,
+      userAgent:         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      viewport:          { width: 1280, height: 800 },
+      locale:            "pt-BR",
+      timezoneId:        "America/Sao_Paulo",
+      ignoreHTTPSErrors: this.ignoreHTTPSErrors,
     });
 
     this.page = await this.context.newPage();
