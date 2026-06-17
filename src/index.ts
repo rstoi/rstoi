@@ -14,6 +14,9 @@ async function main(): Promise<void> {
   } else if (config.adapter === "playwright") {
     const { PlaywrightClient } = await import("./adapters/playwright/index.js");
     adapter = new PlaywrightClient();
+  } else if (config.adapter === "baileys") {
+    const { BaileysClient } = await import("./adapters/baileys/index.js");
+    adapter = new BaileysClient();
   } else {
     const { HttpClient } = await import("./adapters/http/index.js");
     adapter = new HttpClient();

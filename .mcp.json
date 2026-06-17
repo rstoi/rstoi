@@ -11,15 +11,14 @@
       }
     },
     "whatsapp-business": {
-      "_comment": "WhatsApp pessoal via Playwright/Chromium. Requer: npm run setup:chrome && npm run connect",
+      "_comment": "WhatsApp pessoal via Baileys (protocolo nativo, sem browser). Primeira execução: npm run connect para escanear QR.",
       "command": "node_modules/.bin/tsx",
       "args": ["src/index.ts"],
       "cwd": "/home/user/rstoi",
       "env": {
         "PATH": "/opt/node22/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
         "HOME": "/root",
-        "WA_ADAPTER": "playwright",
-        "WA_HEADLESS": "true",
+        "WA_ADAPTER": "baileys",
         "WA_SESSION_DIR": "/home/user/rstoi/data/wa-session",
         "WA_QR_PATH": "/home/user/rstoi/data/qr.png",
         "WA_BLOCKED_GROUPS": "financasfacil",
