@@ -1,0 +1,6 @@
+# Nunca versionar extratos nem relatórios com dados financeiros reais
+output/
+*.pdf
+*.csv
+BB 20*/
+__pycache__/

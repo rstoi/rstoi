@@ -1,0 +1,4 @@
+# Agente de extratos do Banco do Brasil (bb-agent)
+pypdfium2>=4      # leitura de PDF (texto) e renderização para OCR
+Pillow>=10        # imagem para o OCR
+pytesseract>=0.3  # OCR de PDFs digitalizados (requer binário tesseract + idioma por)
