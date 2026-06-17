@@ -19,10 +19,47 @@
  */
 
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
-import { mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
+import { mkdirSync, existsSync, writeFileSync } from "fs";
+import { resolve, join } from "path";
 import type { BmpConfig } from "./config.js";
 import type { LinhaExtrato } from "./types.js";
+
+/** Link encontrado durante a exploração do app. */
+export interface LinkApp {
+  texto: string;
+  href: string;
+  /** True quando texto/href sugerem extrato/conta/movimentações do BMP. */
+  candidato: boolean;
+}
+
+/** Tabela inspecionada em uma página. */
+export interface TabelaApp {
+  headers: string[];
+  amostra: string[][];
+  linhas: number;
+}
+
+/** Página visitada durante a exploração. */
+export interface PaginaApp {
+  url: string;
+  titulo: string;
+  tabelas: TabelaApp[];
+  screenshot: string;
+  html: string;
+}
+
+export interface ResultadoExploracao {
+  links: LinkApp[];
+  paginas: PaginaApp[];
+  /** Sugestão de configuração para o extrato do BMP, se detectado. */
+  sugestao?: {
+    extratoUrl: string;
+    colunas: Partial<BmpConfig["colunas"]>;
+    headers: string[];
+  };
+}
+
+const RX_CANDIDATO = /extrato|conta|saldo|movimenta|lan[çc]amento|transa|bmp/i;
 
 export class AntecipaFacilScraper {
   private browser: Browser | null = null;
@@ -220,6 +257,146 @@ export class AntecipaFacilScraper {
 
     console.error(`[bmp] ${linhas.length} linha(s) extraída(s) do extrato.`);
     return linhas;
+  }
+
+  /**
+   * Percorre o app logado (somente leitura) para LOCALIZAR as transações do
+   * BMP: lista os links de menu, visita os candidatos (extrato/conta/saldo/
+   * movimentações) e inspeciona as tabelas (cabeçalhos + amostra). Salva
+   * screenshots e HTML em `outDir` e sugere `BMP_AF_EXTRATO_URL` + colunas.
+   *
+   * Não executa nenhuma operação bancária — apenas navega e lê.
+   */
+  async explorar(outDir: string): Promise<ResultadoExploracao> {
+    if (!this.page) throw new Error("Não conectado");
+    mkdirSync(outDir, { recursive: true });
+
+    // 1) Mapa de links do app (a partir do dashboard).
+    const links = await this.coletarLinks();
+    const candidatos = links.filter((l) => l.candidato);
+    console.error(`[bmp] ${links.length} link(s); ${candidatos.length} candidato(s) a extrato/conta.`);
+
+    // 2) Visita o dashboard + os candidatos (dedup de href, no máx. 12 páginas).
+    const alvos = [this.page.url(), ...candidatos.map((c) => c.href)];
+    const vistos = new Set<string>();
+    const paginas: PaginaApp[] = [];
+
+    for (const url of alvos) {
+      const abs = this.absolutizar(url);
+      if (!abs || vistos.has(abs)) continue;
+      vistos.add(abs);
+      if (paginas.length >= 12) break;
+      const pag = await this.inspecionarPagina(abs, outDir, paginas.length);
+      if (pag) paginas.push(pag);
+    }
+
+    // 3) Sugestão: melhor tabela que pareça um extrato (tem data + valor).
+    const sugestao = this.derivarSugestao(paginas);
+
+    writeFileSync(
+      join(outDir, "exploracao.json"),
+      JSON.stringify({ links, paginas, sugestao }, null, 2),
+    );
+    console.error(`[bmp] Exploração salva em ${outDir}/exploracao.json`);
+    return { links, paginas, sugestao };
+  }
+
+  private async coletarLinks(): Promise<LinkApp[]> {
+    const raw = await this.page!.evaluate(() =>
+      Array.from(document.querySelectorAll("a[href]")).map((a) => ({
+        texto: (a.textContent ?? "").replace(/\s+/g, " ").trim(),
+        href: (a as HTMLAnchorElement).getAttribute("href") ?? "",
+      })),
+    );
+    const seen = new Set<string>();
+    const links: LinkApp[] = [];
+    for (const l of raw) {
+      const key = `${l.texto}|${l.href}`;
+      if (!l.href || l.href.startsWith("javascript:") || seen.has(key)) continue;
+      seen.add(key);
+      links.push({ ...l, candidato: RX_CANDIDATO.test(`${l.texto} ${l.href}`) });
+    }
+    return links;
+  }
+
+  private absolutizar(href: string): string | null {
+    try {
+      return new URL(href, this.page!.url()).toString();
+    } catch {
+      return null;
+    }
+  }
+
+  private async inspecionarPagina(url: string, outDir: string, idx: number): Promise<PaginaApp | null> {
+    try {
+      await this.page!.goto(url, { waitUntil: "domcontentloaded", timeout: 45_000 });
+      await this.page!.waitForTimeout(1_500); // deixa tabelas renderizarem
+    } catch {
+      console.error(`[bmp] aviso: falha ao abrir ${url}`);
+      return null;
+    }
+
+    const titulo = await this.page!.title().catch(() => "");
+    const screenshot = join(outDir, `pagina-${idx}.png`);
+    const html = join(outDir, `pagina-${idx}.html`);
+    await this.page!.screenshot({ path: screenshot, fullPage: true }).catch(() => {});
+    await this.page!.content().then((c) => writeFileSync(html, c)).catch(() => {});
+
+    const tabelas = await this.page!.evaluate(() => {
+      const txt = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+      const out: { headers: string[]; amostra: string[][]; linhas: number }[] = [];
+      const nodes = document.querySelectorAll('table, [role="table"], [role="grid"]');
+      nodes.forEach((tbl) => {
+        const headEls = tbl.querySelectorAll('thead th, thead td, [role="columnheader"]');
+        let headers = Array.from(headEls).map((h) => txt(h)).filter(Boolean);
+        const rows = Array.from(tbl.querySelectorAll('tbody tr, [role="row"]'));
+        if (headers.length === 0 && rows[0]) {
+          headers = Array.from(rows[0].querySelectorAll('th, td, [role="cell"]')).map((c) => txt(c));
+        }
+        const dataRows = rows.filter((r) => r.querySelector('td, [role="cell"]'));
+        const amostra = dataRows.slice(0, 3).map((r) =>
+          Array.from(r.querySelectorAll('td, [role="cell"]')).map((c) => txt(c)),
+        );
+        if (headers.length || amostra.length) {
+          out.push({ headers, amostra, linhas: dataRows.length });
+        }
+      });
+      return out;
+    });
+
+    console.error(`[bmp] ${url} → ${tabelas.length} tabela(s)`);
+    return { url, titulo, tabelas, screenshot, html };
+  }
+
+  private derivarSugestao(paginas: PaginaApp[]): ResultadoExploracao["sugestao"] {
+    const acha = (headers: string[], rx: RegExp) =>
+      headers.findIndex((h) => rx.test(h));
+
+    let melhor: { url: string; headers: string[]; colunas: Partial<BmpConfig["colunas"]>; score: number } | null = null;
+
+    for (const p of paginas) {
+      for (const t of p.tabelas) {
+        const colunas: Partial<BmpConfig["colunas"]> = {};
+        const data = acha(t.headers, /data|dia/i);
+        const descricao = acha(t.headers, /descri|hist[oó]|lan[çc]amento|movimenta/i);
+        const documento = acha(t.headers, /doc|refer|identific|n[º°o]\b/i);
+        const valor = acha(t.headers, /valor|montante|cr[eé]dito|d[eé]bito/i);
+        const saldo = acha(t.headers, /saldo/i);
+        if (data >= 0) colunas.data = data;
+        if (descricao >= 0) colunas.descricao = descricao;
+        if (documento >= 0) colunas.documento = documento;
+        if (valor >= 0) colunas.valor = valor;
+        if (saldo >= 0) colunas.saldo = saldo;
+
+        // Score: precisa ter data e valor para parecer um extrato.
+        const score = (data >= 0 ? 2 : 0) + (valor >= 0 ? 2 : 0) + (saldo >= 0 ? 1 : 0) + (descricao >= 0 ? 1 : 0);
+        if (score >= 4 && (!melhor || score > melhor.score)) {
+          melhor = { url: p.url, headers: t.headers, colunas, score };
+        }
+      }
+    }
+
+    return melhor ? { extratoUrl: melhor.url, colunas: melhor.colunas, headers: melhor.headers } : undefined;
   }
 
   async disconnect(): Promise<void> {

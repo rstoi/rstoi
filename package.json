@@ -21,6 +21,7 @@
     "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts",
     "bmp:sync": "tsx scripts/bmp-sync.ts",
     "bmp:daemon": "tsx scripts/bmp-daemon.ts",
+    "bmp:explore": "tsx scripts/bmp-explore.ts",
     "mcp:smoke": "node scripts/mcp-smoke.mjs"
   },
   "dependencies": {

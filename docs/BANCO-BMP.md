@@ -34,7 +34,26 @@ npm run bmp:sync
 
 # Daemon: mantém o processo vivo e sincroniza diariamente no horário configurado:
 npm run bmp:daemon
+
+# Explorar o app logado e LOCALIZAR a tabela de transações do BMP (1ª vez):
+npm run bmp:explore
 ```
+
+## Localizar as transações do BMP (`bmp:explore`)
+
+Antes de calibrar os seletores, use o explorador: ele percorre o app **logado**
+(somente leitura), lista os links de menu, visita os candidatos
+(extrato/conta/saldo/movimentações), inspeciona as tabelas e **sugere**
+`BMP_AF_EXTRATO_URL` + os índices `BMP_COL_*`. Salva screenshots, HTML e
+`exploracao.json` em `data/bmp-explore/`.
+
+```bash
+# com janela visível (loga na hora, se ainda não houver sessão salva):
+BMP_HEADLESS=false npm run bmp:explore
+```
+
+Requer, neste ambiente: egress liberado para `dash.antecipafacil.net.br` e uma
+sessão OAuth ativa. Não executa nenhuma operação bancária — apenas navega e lê.
 
 ## Configuração
 
