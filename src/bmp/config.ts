@@ -3,10 +3,17 @@
  * ambiente (segredos no environment do Claude Code na web, nunca no repo).
  * Ver `.env.example` e `docs/BANCO-BMP.md`.
  *
+ * Autenticação: o painel atual (`dash.antecipafacil.net.br`) usa login via
+ * OAuth (Google/Microsoft). Por isso o modo padrão é `session`: você faz o
+ * login interativo uma vez (`BMP_HEADLESS=false`) e a sessão do navegador é
+ * reaproveitada nas execuções seguintes. O modo `password` (usuário/senha)
+ * fica como legado opcional.
+ *
  * Os SELETORES e ÍNDICES de coluna abaixo são parametrizáveis porque a UI real
- * do AntecipaFácil precisa ser inspecionada para ajuste fino. Os valores padrão
- * são heurísticas razoáveis para um formulário de login + tabela de extrato.
+ * do AntecipaFácil precisa ser inspecionada para ajuste fino.
  */
+
+export type BmpAuthMode = "session" | "password";
 
 export interface BmpSelectors {
   /** Candidatos para o campo de usuário/e-mail/CPF no login. */
@@ -28,8 +35,12 @@ export interface BmpConfig {
   url: string;
   /** URL direta do extrato/movimentações da conta BMP (opcional). */
   extratoUrl?: string;
+  /** `session` (OAuth Google/Microsoft, padrão) ou `password` (legado). */
+  authMode: BmpAuthMode;
   user: string;
   password: string;
+  /** Tempo de espera (ms) pelo login interativo quando `BMP_HEADLESS=false`. */
+  loginWaitMs: number;
   /** Rótulo da conta gravado em cada movimentação. */
   conta: string;
 
@@ -54,10 +65,12 @@ function num(v: string | undefined, fallback: number): number {
 
 export function loadBmpConfig(): BmpConfig {
   return {
-    url: process.env.BMP_AF_URL ?? "https://app.antecipafacil.com.br/login",
+    url: process.env.BMP_AF_URL ?? "https://dash.antecipafacil.net.br",
     extratoUrl: process.env.BMP_AF_EXTRATO_URL || undefined,
+    authMode: process.env.BMP_AUTH_MODE === "password" ? "password" : "session",
     user: process.env.BMP_AF_USER ?? "",
     password: process.env.BMP_AF_PASSWORD ?? "",
+    loginWaitMs: num(process.env.BMP_LOGIN_WAIT_MS, 300_000),
     conta: process.env.BMP_CONTA ?? "BMP conta corrente",
 
     headless: process.env.BMP_HEADLESS !== "false",

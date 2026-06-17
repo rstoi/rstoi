@@ -43,8 +43,10 @@ repositório). Referência completa em `.env.example`:
 
 | Variável | Função | Padrão |
 |---|---|---|
-| `BMP_AF_USER` / `BMP_AF_PASSWORD` | Credenciais do AntecipaFácil (**segredo**) | — |
-| `BMP_AF_URL` | URL de login | `https://app.antecipafacil.com.br/login` |
+| `BMP_AUTH_MODE` | `session` (OAuth Google/Microsoft) ou `password` (legado) | `session` |
+| `BMP_AF_USER` / `BMP_AF_PASSWORD` | Credenciais (apenas modo `password`, **segredo**) | — |
+| `BMP_LOGIN_WAIT_MS` | Espera pelo login interativo (`BMP_HEADLESS=false`) | `300000` |
+| `BMP_AF_URL` | URL do painel | `https://dash.antecipafacil.net.br` |
 | `BMP_AF_EXTRATO_URL` | URL direta do extrato da conta BMP (opcional) | — |
 | `BMP_CONTA` | Rótulo gravado em cada movimentação | `BMP conta corrente` |
 | `BMP_DB_PATH` | Arquivo SQLite | `./data/bmp.db` |
@@ -61,26 +63,45 @@ Os seletores e índices de coluna padrão são **heurísticas** — a UI real do
 AntecipaFácil precisa ser **inspecionada** e os valores ajustados via
 `BMP_SEL_*` / `BMP_COL_*`. Abra a página de extrato no navegador, identifique:
 
-1. os campos de **usuário** e **senha** e o **botão** de login (`BMP_SEL_USER`,
-   `BMP_SEL_PASSWORD`, `BMP_SEL_SUBMIT`);
-2. um elemento que só existe **após o login** (`BMP_SEL_LOGGED_IN`);
-3. as **linhas** da tabela de extrato (`BMP_SEL_ROW`) e suas **células**
+1. um elemento que só existe **após o login** (`BMP_SEL_LOGGED_IN`);
+2. as **linhas** da tabela de extrato (`BMP_SEL_ROW`) e suas **células**
    (`BMP_SEL_CELL`);
-4. a ordem das colunas (`BMP_COL_DATA`, `BMP_COL_DESCRICAO`, `BMP_COL_DOCUMENTO`,
-   `BMP_COL_VALOR`, `BMP_COL_SALDO`).
+3. a ordem das colunas (`BMP_COL_DATA`, `BMP_COL_DESCRICAO`, `BMP_COL_DOCUMENTO`,
+   `BMP_COL_VALOR`, `BMP_COL_SALDO`);
+4. apenas no modo `password`: campos de usuário/senha e botão
+   (`BMP_SEL_USER`, `BMP_SEL_PASSWORD`, `BMP_SEL_SUBMIT`).
 
 Para depurar com a janela visível: `BMP_HEADLESS=false npm run bmp:sync`.
 
+## Autenticação (OAuth Google/Microsoft)
+
+O painel `dash.antecipafacil.net.br` autentica via **OAuth** (Google/Microsoft),
+não por usuário/senha. Não há como automatizar esse fluxo apenas com o e-mail —
+ele exige senha + 2FA + consentimento. Por isso o **modo padrão é `session`**:
+
+1. Faça o **login interativo uma vez** com a janela visível:
+   ```bash
+   BMP_HEADLESS=false npm run bmp:sync
+   ```
+   Conclua o login Google/Microsoft na janela; a sessão é gravada em
+   `BMP_SESSION_DIR` (`./data/bmp-session`).
+2. As execuções seguintes **reaproveitam a sessão** — sem relogar, até expirar.
+
+O modo `password` (`BMP_AUTH_MODE=password` + `BMP_AF_USER/PASSWORD`) existe como
+legado, caso haja um login por formulário.
+
 ## Pré-requisitos do ambiente
 
-- **Egress de rede**: a política do environment precisa **liberar o host do
-  AntecipaFácil** (ex.: `app.antecipafacil.com.br`). Por padrão o ambiente
-  libera essencialmente `github.com` + registries — ver `docs/RESILIENCIA.md`.
+- **Egress de rede**: a política do environment precisa **liberar os hosts** do
+  AntecipaFácil — `dash.antecipafacil.net.br` e `antecipafacil.net.br` — além
+  dos domínios de login (`accounts.google.com`, `*.googleusercontent.com`). Por
+  padrão o ambiente libera essencialmente `github.com` + registries; sem isso o
+  acesso retorna `403 host_not_allowed`. Ver `docs/RESILIENCIA.md`.
 - **Chromium**: instalado pelo `SessionStart` hook / imagem base
   (`/opt/pw-browsers`), igual ao adaptador Playwright do WhatsApp.
-- **2FA/MFA**: se o AntecipaFácil exigir segundo fator, o login automático
-  falha. Nesse caso, autentique uma vez com `BMP_HEADLESS=false` para gravar a
-  sessão em `BMP_SESSION_DIR` (reutilizada nas execuções seguintes).
+- **Sessão OAuth e ambiente efêmero**: `data/bmp-session` **não sobrevive a
+  reboots**. Para autonomia diária real, persista essa pasta externamente — do
+  contrário o login interativo precisa ser refeito a cada container novo.
 
 ## Sincronização diária às 01:00 — resiliência
 

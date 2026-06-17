@@ -3,8 +3,12 @@
  *
  * Fluxo:
  *   1. Abre o Chromium restaurando a sessão salva (cookies/localStorage).
- *   2. Vai até a URL de login; se houver formulário e a sessão não estiver
- *      ativa, preenche usuário/senha (de variáveis de ambiente) e entra.
+ *   2. Vai até a URL do painel. Autenticação:
+ *        - modo `session` (padrão): login via OAuth (Google/Microsoft). Se a
+ *          sessão salva não estiver ativa, aguarda o login interativo quando a
+ *          janela está visível (BMP_HEADLESS=false); em headless, falha com
+ *          orientação clara para gravar a sessão uma vez.
+ *        - modo `password` (legado): preenche usuário/senha do ambiente.
  *   3. Navega até o extrato/movimentações (BMP_AF_EXTRATO_URL, se definido).
  *   4. Extrai as linhas da tabela em `LinhaExtrato[]`.
  *   5. Persiste a sessão para a próxima execução.
@@ -88,26 +92,67 @@ export class AntecipaFacilScraper {
       return;
     }
 
-    const userField = this.page.locator(this.cfg.selectors.user).first();
+    if (this.cfg.authMode === "password") {
+      await this.loginComSenha();
+    } else {
+      await this.loginComSessaoOAuth();
+    }
+  }
+
+  /**
+   * Modo padrão: login via OAuth (Google/Microsoft). Não há como automatizar o
+   * fluxo só com o e-mail — depende de senha + 2FA + consentimento. Em janela
+   * visível, aguardamos o login manual e reaproveitamos a sessão; em headless,
+   * orientamos a gravar a sessão uma vez.
+   */
+  private async loginComSessaoOAuth(): Promise<void> {
+    if (this.cfg.headless) {
+      throw new Error(
+        "Sessão OAuth ausente/expirada e execução headless. Faça o login interativo uma vez para gravar a sessão:\n" +
+          "  BMP_HEADLESS=false npm run bmp:sync\n" +
+          `Depois, as execuções reaproveitam a sessão em ${this.sessionDir}.`,
+      );
+    }
+
+    const minutos = Math.round(this.cfg.loginWaitMs / 60_000);
+    console.error(
+      `[bmp] Aguardando login OAuth (Google/Microsoft) na janela do navegador — até ${minutos} min…`,
+    );
+
+    const deadline = Date.now() + this.cfg.loginWaitMs;
+    while (Date.now() < deadline) {
+      if (await this.isLoggedIn()) {
+        console.error("[bmp] Login concluído — autenticado ✓");
+        return;
+      }
+      await this.page!.waitForTimeout(3_000);
+    }
+    throw new Error(
+      "Tempo esgotado aguardando o login OAuth. Conclua o login na janela ou ajuste BMP_LOGIN_WAIT_MS/BMP_SEL_LOGGED_IN.",
+    );
+  }
+
+  /** Modo legado: formulário usuário/senha (env BMP_AF_USER/PASSWORD). */
+  private async loginComSenha(): Promise<void> {
+    const userField = this.page!.locator(this.cfg.selectors.user).first();
     const hasLoginForm = await userField.count().then((c) => c > 0).catch(() => false);
 
     if (!hasLoginForm) {
       throw new Error(
-        "Não autenticado e formulário de login não encontrado. Ajuste BMP_SEL_USER/PASSWORD/SUBMIT ou refaça a sessão.",
+        "Não autenticado e formulário de login não encontrado. Ajuste BMP_SEL_USER/PASSWORD/SUBMIT ou use BMP_AUTH_MODE=session.",
       );
     }
     if (!this.cfg.user || !this.cfg.password) {
       throw new Error("BMP_AF_USER/BMP_AF_PASSWORD não configurados — não é possível autenticar.");
     }
 
-    console.error("[bmp] Preenchendo login…");
+    console.error("[bmp] Preenchendo login (modo senha)…");
     await userField.fill(this.cfg.user);
-    await this.page.locator(this.cfg.selectors.password).first().fill(this.cfg.password);
-    await this.page.locator(this.cfg.selectors.submit).first().click();
+    await this.page!.locator(this.cfg.selectors.password).first().fill(this.cfg.password);
+    await this.page!.locator(this.cfg.selectors.submit).first().click();
 
-    // Aguarda indício de login (dashboard) por até 30s.
     try {
-      await this.page.locator(this.cfg.selectors.loggedIn).first().waitFor({ timeout: 30_000 });
+      await this.page!.locator(this.cfg.selectors.loggedIn).first().waitFor({ timeout: 30_000 });
     } catch {
       /* segue para verificação abaixo */
     }
