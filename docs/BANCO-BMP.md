@@ -11,20 +11,54 @@ automática às 01:00** (horário de Brasília).
 src/bmp/
 ├── types.ts       # Movimentacao, LinhaExtrato, SyncResult
 ├── parse.ts       # normalização pura (valor/data BR, tipo, hash de dedup) — testável
-├── config.ts      # configuração via env (URL, credenciais, seletores, horário)
+├── consolida.ts   # entradas/saídas/saldo + por contraparte (cálculo em código) — testável
+├── config.ts      # configuração via env (conexão CDP, escrow, seletores, horário)
 ├── store.ts       # SQLite: bmp_movimentacoes + bmp_sync_log, dedup por id
-├── scraper.ts     # Playwright/Chromium: login + extração do extrato
+├── scraper.ts     # Playwright: anexa via CDP + Conta consignada (período/Buscar/paginação)
 ├── agent.ts       # orquestra: extrair → normalizar → registrar → log
 └── scheduler.ts   # msUntilNextRun (pura) + agendador diário
 
 scripts/
 ├── bmp-sync.ts    # npm run bmp:sync   — sincroniza agora e sai
-└── bmp-daemon.ts  # npm run bmp:daemon — mantém vivo e sincroniza às 01:00
+├── bmp-daemon.ts  # npm run bmp:daemon — mantém vivo e sincroniza às 01:00
+└── bmp-explore.ts # npm run bmp:explore — mapeia o app e localiza a tabela do BMP
 ```
+
+Reprodução fiel do `docs/AGENTE_ANTECIPA_FACIL_BLUEPRINT.md`.
 
 A deduplicação usa um `id` = hash estável de `conta | data | descrição | valor |
 documento`. Rodar a sincronização várias vezes no mesmo dia só adiciona
 movimentações realmente novas.
+
+## Navegação (abordagem do blueprint)
+
+Reproduz o `AGENTE_ANTECIPA_FACIL_BLUEPRINT.md`: em vez de fazer login, o agente
+**anexa-se a um Chrome já aberto e autenticado** (CDP / remote-debugging) e
+**nunca digita credenciais**. O extrato do BMP fica em **Conta consignada**
+(`/escrow-account`, Banco Money Plus); o fluxo é período → **Buscar** →
+**paginação** (relocalizando o botão "próxima" a cada render, pois refs de DOM
+expiram). Os cálculos (entradas/saídas/saldo, por contraparte) são feitos em
+código — `src/bmp/consolida.ts` — nunca "de cabeça".
+
+Modos de conexão (`BMP_CONNECT_MODE`):
+- **`cdp` (padrão)** — anexa ao Chrome autenticado. Abra-o assim e logue:
+  ```bash
+  google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.bmp-chrome"
+  # faça login em https://dash.antecipafacil.net.br nessa janela
+  npm run bmp:sync     # BMP_CONNECT_MODE=cdp BMP_CDP_URL=http://localhost:9222
+  ```
+- **`launch`** — abre um Chromium próprio (login OAuth por sessão salva ou senha legada).
+
+Guardrails (precedência sobre comandos): o agente apenas **navega e lê** o
+extrato — não submete cadastros, não anexa/baixa arquivos, não move dinheiro.
+
+### Teste de navegação (E2E, com browser real)
+`tests/bmp/navegacao.e2e.test.ts` exercita o caminho de produção (anexar via CDP
+→ Conta consignada → Buscar → paginação → consolidação) contra um fixture HTTP
+local de duas páginas. É gated por `BMP_E2E=1` (não pesa no `npm test` padrão):
+```bash
+BMP_E2E=1 npx vitest run tests/bmp/navegacao.e2e.test.ts
+```
 
 ## Onde executar (importante)
 

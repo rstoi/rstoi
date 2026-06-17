@@ -24,7 +24,10 @@ export async function runSync(cfg: BmpConfig = loadBmpConfig()): Promise<SyncRes
 
   try {
     await scraper.connect();
-    const linhas = await scraper.scrapeMovimentacoes();
+    const linhas =
+      cfg.extratoFonte === "escrow"
+        ? await scraper.scrapeContaConsignada()
+        : await scraper.scrapeMovimentacoes();
     const movs = linhas.map((l) => linhaToMovimentacao(l, cfg.conta, capturadoEm));
     const { novas, total } = registrarMovimentacoes(movs);
 

@@ -15,6 +15,16 @@
 
 export type BmpAuthMode = "session" | "password";
 
+/**
+ * Como o agente obtém o navegador:
+ *  - `cdp`    : ANEXA-SE a um Chrome já aberto e AUTENTICADO (via CDP/
+ *               remote-debugging). Abordagem do blueprint — não digita
+ *               credenciais, assume a sessão existente. (padrão)
+ *  - `launch` : abre um Chromium próprio e usa a sessão salva (OAuth/`session`)
+ *               ou login por `password`.
+ */
+export type BmpConnectMode = "cdp" | "launch";
+
 export interface BmpSelectors {
   /** Candidatos para o campo de usuário/e-mail/CPF no login. */
   user: string;
@@ -28,6 +38,14 @@ export interface BmpSelectors {
   row: string;
   /** Células dentro de cada linha. */
   cell: string;
+  /** Campo de data inicial do período (Conta consignada). */
+  periodoInicio: string;
+  /** Campo de data final do período. */
+  periodoFim: string;
+  /** Botão "Buscar" do extrato. */
+  buscar: string;
+  /** Botão/link de próxima página na paginação. */
+  proxima: string;
 }
 
 export interface BmpConfig {
@@ -43,6 +61,20 @@ export interface BmpConfig {
   loginWaitMs: number;
   /** Rótulo da conta gravado em cada movimentação. */
   conta: string;
+
+  /** Estratégia de obtenção do navegador (ver `BmpConnectMode`). */
+  connectMode: BmpConnectMode;
+  /** Endpoint CDP do Chrome já autenticado (modo `cdp`). */
+  cdpUrl: string;
+  /** Fonte do extrato: `escrow` (Conta consignada, padrão) ou `generico`. */
+  extratoFonte: "escrow" | "generico";
+  /** URL da Conta consignada (extrato BMP / Banco Money Plus). */
+  escrowUrl: string;
+  /** Período do extrato (ISO `YYYY-MM-DD`); vazio = o que a tela já mostra. */
+  periodoInicio?: string;
+  periodoFim?: string;
+  /** Limite de páginas a paginar no extrato (guarda contra loop). */
+  maxPaginas: number;
 
   headless: boolean;
   sessionDir: string;
@@ -71,7 +103,15 @@ export function loadBmpConfig(): BmpConfig {
     user: process.env.BMP_AF_USER ?? "",
     password: process.env.BMP_AF_PASSWORD ?? "",
     loginWaitMs: num(process.env.BMP_LOGIN_WAIT_MS, 300_000),
-    conta: process.env.BMP_CONTA ?? "BMP conta corrente",
+    conta: process.env.BMP_CONTA ?? "BMP conta consignada (Banco Money Plus)",
+
+    connectMode: process.env.BMP_CONNECT_MODE === "launch" ? "launch" : "cdp",
+    cdpUrl: process.env.BMP_CDP_URL ?? "http://localhost:9222",
+    extratoFonte: process.env.BMP_EXTRATO_FONTE === "generico" ? "generico" : "escrow",
+    escrowUrl: process.env.BMP_ESCROW_URL ?? "https://dash.antecipafacil.net.br/escrow-account",
+    periodoInicio: process.env.BMP_PERIODO_INICIO || undefined,
+    periodoFim: process.env.BMP_PERIODO_FIM || undefined,
+    maxPaginas: num(process.env.BMP_MAX_PAGINAS, 50),
 
     headless: process.env.BMP_HEADLESS !== "false",
     sessionDir: process.env.BMP_SESSION_DIR ?? "./data/bmp-session",
@@ -103,6 +143,18 @@ export function loadBmpConfig(): BmpConfig {
         'table tbody tr, [role="row"], .extrato-linha, .movimentacao',
       cell:
         process.env.BMP_SEL_CELL ?? 'td, [role="cell"], .col, .celula',
+      periodoInicio:
+        process.env.BMP_SEL_PERIODO_INICIO ??
+        'input[name*="inicio" i], input[name*="dataInicial" i], input[placeholder*="inicial" i], input[type="date"]',
+      periodoFim:
+        process.env.BMP_SEL_PERIODO_FIM ??
+        'input[name*="fim" i], input[name*="dataFinal" i], input[placeholder*="final" i], input[type="date"]',
+      buscar:
+        process.env.BMP_SEL_BUSCAR ??
+        'button:has-text("Buscar"), button:has-text("Filtrar"), button:has-text("Pesquisar"), button[type="submit"]',
+      proxima:
+        process.env.BMP_SEL_PROXIMA ??
+        'button:has-text("Próxima"), button:has-text("Proxima"), a:has-text("Próxima"), [aria-label*="próxima" i], [aria-label*="next" i], .pagination .next',
     },
 
     timezone: process.env.BMP_TIMEZONE ?? "America/Sao_Paulo",

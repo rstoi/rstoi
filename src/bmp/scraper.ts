@@ -87,7 +87,65 @@ export class AntecipaFacilScraper {
     return undefined; // Playwright usa o Chromium gerenciado
   }
 
+  /** True quando o navegador é externo (CDP) — não devemos fechá-lo. */
+  private externo = false;
+
   async connect(): Promise<void> {
+    if (this.cfg.connectMode === "cdp") {
+      await this.connectViaCdp();
+    } else {
+      await this.connectViaLaunch();
+    }
+  }
+
+  /**
+   * Abordagem do blueprint: ANEXA-SE a um Chrome já aberto e AUTENTICADO via
+   * CDP (remote-debugging). Não digita credenciais. Seleciona a aba que está
+   * no domínio do app (equivalente ao `select_browser`); se só houver tela de
+   * login, orienta o usuário a abrir/escolher o navegador certo.
+   */
+  private async connectViaCdp(): Promise<void> {
+    console.error(`[bmp] Conectando ao navegador autenticado via CDP: ${this.cfg.cdpUrl}`);
+    try {
+      this.browser = await chromium.connectOverCDP(this.cfg.cdpUrl);
+    } catch (e) {
+      throw new Error(
+        `Não consegui conectar ao Chrome em ${this.cfg.cdpUrl}. Abra o Chrome com remote-debugging e já logado no AntecipaFácil:\n` +
+          `  google-chrome --remote-debugging-port=9222 --user-data-dir=$HOME/.bmp-chrome\n` +
+          `Depois faça login em ${this.cfg.url} nessa janela. Detalhe: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    this.externo = true;
+    this.context = this.browser.contexts()[0] ?? (await this.browser.newContext());
+    this.page = await this.selecionarAbaAutenticada(this.context);
+
+    if (!(await this.isLoggedIn())) {
+      throw new Error(
+        "O navegador conectado não está autenticado no AntecipaFácil (caí na tela de login). " +
+          "Garanta que a aba logada vive NESTE Chrome (a sessão pode estar em outro navegador, ex.: Edge vs Chrome) " +
+          "e não digito credenciais — abra/escolha o navegador correto e tente de novo.",
+      );
+    }
+    console.error("[bmp] Navegador autenticado conectado ✓");
+  }
+
+  /** Escolhe a aba já no domínio do app; senão usa/abre uma e navega até ele. */
+  private async selecionarAbaAutenticada(ctx: BrowserContext): Promise<Page> {
+    const host = new URL(this.cfg.url).host;
+    for (const p of ctx.pages()) {
+      try {
+        if (new URL(p.url()).host.includes(host.replace(/^www\./, ""))) return p;
+      } catch {
+        /* ignora abas about:blank etc. */
+      }
+    }
+    const page = ctx.pages()[0] ?? (await ctx.newPage());
+    await page.goto(this.cfg.url, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {});
+    return page;
+  }
+
+  /** Abre um Chromium próprio (sessão salva OAuth ou login por senha). */
+  private async connectViaLaunch(): Promise<void> {
     const hasSession = existsSync(this.storageFile);
 
     this.browser = await chromium.launch({
@@ -260,6 +318,112 @@ export class AntecipaFacilScraper {
   }
 
   /**
+   * Workflow B do blueprint — extrai o extrato da CONTA CONSIGNADA (escrow,
+   * Banco Money Plus): abre `/escrow-account`, amplia o período (data inicial/
+   * final) → Buscar, e PAGINA lendo a tabela página a página. Refs de DOM
+   * expiram a cada render, então relocalizamos o botão "próxima" a cada volta.
+   *
+   * Somente leitura — não submete cadastros, não move dinheiro (guardrails).
+   */
+  async scrapeContaConsignada(): Promise<LinhaExtrato[]> {
+    if (!this.page) throw new Error("Não conectado");
+    const page = this.page;
+
+    console.error(`[bmp] Conta consignada: ${this.cfg.escrowUrl}`);
+    await page.goto(this.cfg.escrowUrl, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {});
+
+    // 1) Período (best-effort: só se os campos existirem).
+    await this.preencherPeriodo();
+
+    // 2) Buscar.
+    const buscar = page.locator(this.cfg.selectors.buscar).first();
+    if (await buscar.count().then((c) => c > 0).catch(() => false)) {
+      await buscar.click().catch(() => {});
+      await page.waitForTimeout(1_500);
+    }
+
+    // 3) Paginação — acumula linhas, deduplicando por conteúdo de linha.
+    const todas: LinhaExtrato[] = [];
+    const vistas = new Set<string>();
+    for (let pg = 1; pg <= this.cfg.maxPaginas; pg++) {
+      await page
+        .locator(this.cfg.selectors.row)
+        .first()
+        .waitFor({ timeout: 15_000 })
+        .catch(() => {});
+      const linhas = await this.lerLinhasDaPagina();
+      let novas = 0;
+      for (const l of linhas) {
+        const chave = `${l.data}|${l.descricao}|${l.valor}|${l.saldo ?? ""}`;
+        if (vistas.has(chave)) continue;
+        vistas.add(chave);
+        todas.push(l);
+        novas++;
+      }
+      console.error(`[bmp] página ${pg}: ${linhas.length} linha(s), ${novas} nova(s) (total ${todas.length}).`);
+
+      // Relocaliza o "próxima" a cada iteração (refs expiram após o render).
+      const proxima = page.locator(this.cfg.selectors.proxima).first();
+      const temProxima = await proxima.count().then((c) => c > 0).catch(() => false);
+      const habilitada = temProxima && (await proxima.isEnabled().catch(() => false));
+      if (!habilitada || novas === 0) break;
+      await proxima.click().catch(() => {});
+      await page.waitForTimeout(1_200);
+    }
+
+    console.error(`[bmp] Conta consignada: ${todas.length} linha(s) no total.`);
+    return todas;
+  }
+
+  /** Preenche data inicial/final do período, se a tela tiver os campos. */
+  private async preencherPeriodo(): Promise<void> {
+    const page = this.page!;
+    const set = async (sel: string, valor?: string) => {
+      if (!valor) return;
+      const f = page.locator(sel).first();
+      if (await f.count().then((c) => c > 0).catch(() => false)) {
+        await f.fill(this.formatarDataCampo(valor)).catch(() => {});
+      }
+    };
+    await set(this.cfg.selectors.periodoInicio, this.cfg.periodoInicio);
+    await set(this.cfg.selectors.periodoFim, this.cfg.periodoFim);
+  }
+
+  /** input[type=date] usa ISO; demais campos costumam usar dd/mm/aaaa. */
+  private formatarDataCampo(iso: string): string {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? iso : iso; // mantém ISO; o fill aceita ISO em date inputs
+  }
+
+  /** Lê as linhas da tabela atual usando os seletores/colunas configurados. */
+  private async lerLinhasDaPagina(): Promise<LinhaExtrato[]> {
+    const { row, cell } = this.cfg.selectors;
+    const col = this.cfg.colunas;
+    return this.page!.evaluate(
+      ({ rowSel, cellSel, col }) => {
+        const text = (el: Element | null | undefined): string =>
+          (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+        const at = (cells: Element[], i: number): string =>
+          i >= 0 && i < cells.length ? text(cells[i]) : "";
+        return Array.from(document.querySelectorAll(rowSel))
+          .map((tr) => {
+            const cells = Array.from(tr.querySelectorAll(cellSel));
+            if (cells.length === 0) return null;
+            return {
+              data: at(cells, col.data),
+              descricao: at(cells, col.descricao),
+              documento: at(cells, col.documento) || undefined,
+              valor: at(cells, col.valor),
+              saldo: at(cells, col.saldo) || undefined,
+            };
+          })
+          .filter((r): r is NonNullable<typeof r> => r !== null && (!!r.data || !!r.valor));
+      },
+      { rowSel: row, cellSel: cell, col },
+    );
+  }
+
+  /**
    * Percorre o app logado (somente leitura) para LOCALIZAR as transações do
    * BMP: lista os links de menu, visita os candidatos (extrato/conta/saldo/
    * movimentações) e inspeciona as tabelas (cabeçalhos + amostra). Salva
@@ -400,6 +564,8 @@ export class AntecipaFacilScraper {
   }
 
   async disconnect(): Promise<void> {
+    // Em CDP, close() apenas DESCONECTA do Chrome do usuário (não fecha a janela);
+    // no modo launch, encerra o Chromium próprio.
     await this.browser?.close().catch(() => {});
     this.browser = null;
     this.context = null;
