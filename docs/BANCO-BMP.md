@@ -26,6 +26,46 @@ A deduplicação usa um `id` = hash estável de `conta | data | descrição | va
 documento`. Rodar a sincronização várias vezes no mesmo dia só adiciona
 movimentações realmente novas.
 
+## Onde executar (importante)
+
+O ambiente do **Claude Code na web é mal adaptado** para este agente, por dois
+motivos: (1) a allowlist de egress não inclui `dash.antecipafacil.net.br`
+(retorna `403 host_not_allowed`); e (2) o login é **OAuth do Google**, que exige
+uma janela de navegador real para consentimento — inexistente num container
+headless na nuvem.
+
+➡️ **Recomendado: rodar na sua máquina (ou um servidor/VPS seu)**, onde há
+internet aberta e um navegador para o primeiro login. Passos:
+
+```bash
+git clone <repo> && cd rstoi
+git checkout claude/beautiful-curie-3upyd0
+npm install
+npx playwright install chromium
+
+# 1) Login OAuth (janela visível) + localizar a tabela do BMP:
+BMP_HEADLESS=false npm run bmp:explore
+#    → conclua o login Google (renato@baita.ac) na janela;
+#    → veja a sugestão de BMP_AF_EXTRATO_URL e BMP_COL_* impressa no terminal.
+
+# 2) Ajuste o extrato no .env (ou exporte) conforme a sugestão e extraia:
+npm run bmp:sync          # grava data/bmp.db e imprime o resumo do dia
+```
+
+Agendamento diário às 01:00 via **cron do SO** (resiliente, processo curto):
+
+```cron
+0 1 * * *  cd /caminho/rstoi && /usr/bin/npm run bmp:sync >> data/bmp-cron.log 2>&1
+```
+
+(Alternativa: `npm run bmp:daemon`, que agenda internamente — mas exige manter o
+processo vivo.)
+
+Para rodar **no ambiente da web**, seria necessário: liberar os hosts no egress
+(`dash.antecipafacil.net.br`, `antecipafacil.net.br`, eventual
+`api.antecipafacil.net.br`, `*.googleusercontent.com`) e tratar o login OAuth via
+o display do `computer-use` — bem mais atrito que rodar localmente.
+
 ## Uso
 
 ```bash
