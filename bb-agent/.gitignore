@@ -1,6 +1,9 @@
 # Nunca versionar extratos nem relatórios com dados financeiros reais
 output/
+extratos/
+.bb-profile/
 *.pdf
 *.csv
+*.ofx
 BB 20*/
 __pycache__/

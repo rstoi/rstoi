@@ -21,11 +21,24 @@ pip install pypdfium2 Pillow pytesseract     # pytesseract só é necessário p/
 
 ```bash
 python3 parse_extrato.py "BB 2024" "BB 2025" "BB 2026" --outdir output
-# ou arquivos avulsos:
-python3 parse_extrato.py "BB 2025/MAIO 25.pdf" --outdir output
+# ou arquivos avulsos (PDF, OFX ou CSV):
+python3 parse_extrato.py "BB 2025/MAIO 25.pdf" extrato.ofx extrato.csv --outdir output
 ```
 
-Aceita pastas (varre `*.pdf` recursivamente) ou PDFs individuais.
+Aceita **pastas** (varre `*.pdf`, `*.ofx`, `*.csv` recursivamente) ou arquivos
+individuais. Pode misturar formatos no mesmo comando — todos entram no mesmo
+relatório consolidado.
+
+### Formatos de entrada
+
+| Formato | Como é lido |
+|---|---|
+| **PDF** | Texto nativo (pypdfium2) e, se for digitalizado, OCR (Tesseract) |
+| **OFX** | Exportação estruturada do BB (OFX 1.x/2.x); separa por mês automaticamente |
+| **CSV** | Exportação do BB; delimitador `;`/`,` autodetectado; colunas mapeadas pelo cabeçalho |
+
+> Sempre que possível, prefira **OFX ou CSV**: são estruturados, dispensam OCR e
+> são mais confiáveis que o PDF.
 
 ## Saídas (em `--outdir`, padrão `output/`)
 
@@ -63,13 +76,35 @@ Com isso o agente:
 
 Esses avisos aparecem no fim do `relatorio.md` e no `qualidade_dados` do JSON.
 
+## Baixar extratos do site do BB (semiautomático)
+
+`bb_export.mjs` ajuda a **baixar** os extratos — para rodar **na sua máquina**,
+não em ambientes remotos. Ele abre um navegador real, **você loga manualmente**
+(o script nunca toca nas suas credenciais/token) e ele captura automaticamente
+todo arquivo baixado (PDF/OFX/CSV/TXT), organizando numa pasta.
+
+```bash
+npm i playwright
+npx playwright install chromium
+node bb_export.mjs --out ./extratos --profile ./.bb-profile
+# faça login + baixe os meses no navegador; depois:
+python3 parse_extrato.py ./extratos --outdir output
+```
+
+O `--profile` mantém o **registro do dispositivo** entre execuções, reduzindo
+pedidos de token. Login totalmente automático **não** é suportado de propósito:
+o BB usa teclado virtual, token no app e reconhecimento de dispositivo —
+automatizar isso seria frágil e inseguro. Para acesso 100% programático, o
+caminho correto é **Open Finance** (agregadores como Pluggy/Belvo) ou a API
+corporativa do BB Developers.
+
 ## Testes
 
 ```bash
 python3 -m unittest test_parse_extrato -v
 ```
 
-Os testes usam linhas sintéticas (sem dados bancários reais).
+Os testes usam linhas/arquivos sintéticos (sem dados bancários reais).
 
 ## Privacidade
 

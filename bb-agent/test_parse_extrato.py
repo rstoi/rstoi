@@ -116,6 +116,58 @@ class TestDeduplicate(unittest.TestCase):
         self.assertEqual(dq["meses_faltantes"], ["2024-09", "2024-10"])
 
 
+SAMPLE_OFX = """OFXHEADER:100
+<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS>
+<BANKACCTFROM><ACCTID>99243-7</BANKACCTFROM>
+<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20250120120000[-3:GMT]<TRNAMT>7000.00<FITID>1<MEMO>Pix - Recebido</STMTTRN>
+<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20250120<TRNAMT>-35527.44<FITID>2<MEMO>BB Giro</STMTTRN>
+<STMTTRN><TRNTYPE>CREDIT<DTPOSTED>20250120<TRNAMT>28527.44<FITID>3<MEMO>BB Rende Facil</STMTTRN>
+<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20250210<TRNAMT>-750.96<FITID>4<MEMO>BB Consorcio - Prestacao</STMTTRN>
+</STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>
+"""
+
+SAMPLE_CSV = '\n'.join([
+    '"Extrato";"";"";"";""',
+    '"Data";"Historico";"Numero do documento";"Valor";"Tipo Lancamento"',
+    '"20/01/2025";"Pix - Recebido";"373757048962561";"7.000,00";"Credito"',
+    '"20/01/2025";"BB Giro";"5228693000111";"35.527,44";"Debito"',
+    '"05/02/2025";"Estorno de Debito";"999";"1.234,56";"Credito"',
+])
+
+
+class TestOfxImport(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def _write(self, name, content):
+        from pathlib import Path
+        p = Path(self.tmp.name) / name
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_ofx_groups_by_month_and_categorizes(self):
+        stmts = P.parse_ofx(self._write("e.ofx", SAMPLE_OFX))
+        by = {s.periodo: s for s in stmts}
+        self.assertEqual(set(by), {"2025-01", "2025-02"})
+        jan = by["2025-01"]
+        self.assertEqual(jan.conta, "99243-7")
+        self.assertEqual(jan.creditos, 7000.0)        # Rende Facil é interno, excluído
+        self.assertEqual(jan.debitos, 35527.44)
+        self.assertTrue(any(t.interno for t in jan.transactions))
+
+    def test_csv_with_debit_credit_column(self):
+        stmts = P.parse_csv(self._write("e.csv", SAMPLE_CSV))
+        by = {s.periodo: s for s in stmts}
+        self.assertEqual(by["2025-01"].debitos, 35527.44)
+        self.assertEqual(by["2025-01"].creditos, 7000.0)
+        self.assertEqual(by["2025-02"].transactions[0].categoria, "Estornos")
+        self.assertEqual(by["2025-02"].transactions[0].valor, 1234.56)
+
+
 class TestPeriodFromName(unittest.TestCase):
     def test_period_from_name(self):
         self.assertEqual(P._period_from_name("BB janeiro 24.pdf"), "2024-01")

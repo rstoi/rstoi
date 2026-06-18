@@ -234,28 +234,28 @@ def parse_statement(pdf_path: Path) -> Statement:
         dc = vm.group("dc")
         valor = br_to_float(vm.group("valor"))
         signed = valor if dc == "C" else -valor
-        categoria, interno = categorize(desc)
 
-        if categoria == "Saldo anterior":
+        if categorize(desc)[0] == "Saldo anterior":
             stmt.saldo_anterior = signed
             continue
-        if categoria == "Saldo final":
-            continue
-
-        stmt.transactions.append(Transaction(
-            arquivo=pdf_path.name,
-            periodo=periodo,
-            data=m.group("d2") or m.group("d1"),
-            historico_cod=m.group("hist"),
-            descricao=desc,
-            detalhe="",
-            documento=documento,
-            valor=round(signed, 2),
-            tipo=dc,
-            categoria=categoria,
-            interno=interno,
-        ))
+        tx = make_transaction(pdf_path.name, periodo, m.group("d2") or m.group("d1"),
+                              m.group("hist"), desc, documento, signed, dc)
+        if tx:
+            stmt.transactions.append(tx)
     return stmt
+
+
+def make_transaction(arquivo: str, periodo: str, data: str, hist: str, desc: str,
+                     documento: str, signed: float, dc: str) -> Transaction | None:
+    """Cria um lançamento já categorizado, ou None para linhas de saldo."""
+    categoria, interno = categorize(desc)
+    if categoria in ("Saldo anterior", "Saldo final"):
+        return None
+    return Transaction(
+        arquivo=arquivo, periodo=periodo, data=data, historico_cod=hist,
+        descricao=desc.strip(), detalhe="", documento=documento,
+        valor=round(signed, 2), tipo=dc, categoria=categoria, interno=interno,
+    )
 
 
 def _period_from_name(name: str) -> str:
@@ -272,6 +272,163 @@ def _period_from_name(name: str) -> str:
     }
     mon = next((v for k, v in months.items() if k in n), "00")
     return f"{year or '????'}-{mon}"
+
+
+# ---------------------------------------------------------------------------
+# Importadores OFX / CSV (exportações estruturadas do BB)
+# ---------------------------------------------------------------------------
+
+def _read_text(path: Path) -> str:
+    """Lê texto tentando UTF-8 e caindo para latin-1 (comum em OFX/CSV do BB)."""
+    data = path.read_bytes()
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("latin-1", errors="ignore")
+
+
+def _month_key(data_ddmmyyyy: str) -> str:
+    d, m, y = data_ddmmyyyy.split("/")
+    return f"{y}-{m}"
+
+
+def _norm_date(s: str) -> str:
+    """Normaliza datas para DD/MM/AAAA (aceita ano com 2 dígitos)."""
+    s = s.strip()
+    m = re.match(r"(\d{2})/(\d{2})/(\d{2,4})", s)
+    if not m:
+        return s
+    d, mo, y = m.groups()
+    if len(y) == 2:
+        y = "20" + y
+    return f"{d}/{mo}/{y}"
+
+
+def _group_by_month(txs: list[Transaction], arquivo: str, conta: str) -> list[Statement]:
+    stmts: dict[str, Statement] = {}
+    for t in txs:
+        s = stmts.get(t.periodo)
+        if s is None:
+            s = Statement(arquivo=arquivo, periodo=t.periodo, conta=conta,
+                          usou_ocr=False)
+            stmts[t.periodo] = s
+        s.transactions.append(t)
+    return [stmts[k] for k in sorted(stmts)]
+
+
+def _ofx_tag(block: str, tag: str) -> str:
+    m = re.search(rf"<{tag}>([^<\r\n]+)", block, re.IGNORECASE)
+    return m.group(1).strip() if m else ""
+
+
+def _ofx_amount(s: str) -> float:
+    s = s.strip()
+    if "," in s and "." not in s:   # alguns bancos usam vírgula decimal no OFX
+        s = s.replace(".", "").replace(",", ".")
+    return float(s)
+
+
+def parse_ofx(path: Path) -> list[Statement]:
+    """Lê um arquivo OFX (Money 2000 / OFX 1.x ou 2.x) do BB."""
+    content = _read_text(path)
+    conta = _ofx_tag(content, "ACCTID")
+    txs: list[Transaction] = []
+    for block in content.split("<STMTTRN>")[1:]:
+        dt = _ofx_tag(block, "DTPOSTED")[:8]
+        amt = _ofx_tag(block, "TRNAMT")
+        if len(dt) != 8 or not amt:
+            continue
+        data = f"{dt[6:8]}/{dt[4:6]}/{dt[0:4]}"
+        signed = _ofx_amount(amt)
+        desc = _ofx_tag(block, "MEMO") or _ofx_tag(block, "NAME")
+        doc = _ofx_tag(block, "CHECKNUM") or _ofx_tag(block, "FITID")
+        tx = make_transaction(path.name, _month_key(data), data, "", desc, doc,
+                              signed, "C" if signed >= 0 else "D")
+        if tx:
+            txs.append(tx)
+    return _group_by_month(txs, path.name, conta)
+
+
+# rótulos de coluna (sem acento/minúsculo) procurados no cabeçalho do CSV
+_CSV_COLS = {
+    "data": ("data lancamento", "data do lancamento", "data"),
+    "desc": ("historico", "lancamento", "descricao", "detalhe", "historico/descricao"),
+    "valor": ("valor", "valor (r$)", "valor r$"),
+    "tipo": ("tipo lancamento", "tipo de lancamento", "tipo", "debito/credito"),
+    "doc": ("numero do documento", "n documento", "documento", "n do documento"),
+}
+
+
+def _find_col(header: list[str], names: tuple[str, ...]) -> int:
+    norm = [strip_accents(h).strip() for h in header]
+    for n in names:
+        if n in norm:
+            return norm.index(n)
+    # match parcial
+    for i, h in enumerate(norm):
+        if any(n in h for n in names):
+            return i
+    return -1
+
+
+def _csv_value(value_str: str, tipo_str: str) -> tuple[float, str]:
+    s = value_str.strip()
+    tip = strip_accents(tipo_str)
+    neg = (s.startswith("-") or s.rstrip().endswith("D") or "deb" in tip
+           or tip.strip() == "d")
+    s = s.lstrip("-").rstrip("CDcd ").strip()
+    v = br_to_float(s) if s else 0.0
+    return (-v if neg else v), ("D" if neg else "C")
+
+
+def parse_csv(path: Path) -> list[Statement]:
+    """Lê um CSV de extrato do BB (delimitador ; ou , autodetectado)."""
+    import csv as _csv
+    text = _read_text(path)
+    rows = list(_csv.reader(text.splitlines(),
+                            delimiter=";" if text.count(";") >= text.count(",") else ","))
+    # localiza a linha de cabeçalho (contém "Data" e "Valor")
+    hidx = next((i for i, r in enumerate(rows)
+                 if _find_col(r, _CSV_COLS["data"]) >= 0
+                 and _find_col(r, _CSV_COLS["valor"]) >= 0), -1)
+    if hidx < 0:
+        return []
+    header = rows[hidx]
+    c = {k: _find_col(header, v) for k, v in _CSV_COLS.items()}
+    conta = ""
+    cm = next((CONTA_RE.search(ln) for ln in text.splitlines() if CONTA_RE.search(ln)), None)
+    if cm:
+        conta = cm.group(1)
+    txs: list[Transaction] = []
+    for r in rows[hidx + 1:]:
+        if c["data"] >= len(r) or c["valor"] >= len(r):
+            continue
+        data = _norm_date(r[c["data"]])
+        if not re.match(r"\d{2}/\d{2}/\d{4}", data):
+            continue
+        tipo = r[c["tipo"]] if 0 <= c["tipo"] < len(r) else ""
+        signed, dc = _csv_value(r[c["valor"]], tipo)
+        desc = r[c["desc"]] if 0 <= c["desc"] < len(r) else ""
+        doc = r[c["doc"]] if 0 <= c["doc"] < len(r) else ""
+        tx = make_transaction(path.name, _month_key(data), data, "", desc, doc,
+                              signed, dc)
+        if tx:
+            txs.append(tx)
+    return _group_by_month(txs, path.name, conta)
+
+
+def load_source(path: Path) -> list[Statement]:
+    """Carrega um extrato a partir de PDF, OFX ou CSV."""
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        return [parse_statement(path)]
+    if suffix == ".ofx":
+        return parse_ofx(path)
+    if suffix == ".csv":
+        return parse_csv(path)
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -326,15 +483,19 @@ def canonical(statements: list[Statement]) -> list[Statement]:
     return [s for s in statements if s.duplicado_de is None]
 
 
-def collect_pdfs(paths: list[str]) -> list[Path]:
+SUPPORTED = (".pdf", ".ofx", ".csv")
+
+
+def collect_sources(paths: list[str]) -> list[Path]:
     out: list[Path] = []
     for p in paths:
         path = Path(p)
         if path.is_dir():
-            out.extend(sorted(path.rglob("*.pdf")))
-        elif path.suffix.lower() == ".pdf":
+            for ext in SUPPORTED:
+                out.extend(path.rglob(f"*{ext}"))
+        elif path.suffix.lower() in SUPPORTED:
             out.append(path)
-    return out
+    return sorted(out)
 
 
 def write_csv(statements: list[Statement], path: Path) -> int:
@@ -446,24 +607,25 @@ def write_report(statements: list[Statement], dq: dict, path: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Agente de extratos do Banco do Brasil")
-    ap.add_argument("paths", nargs="+", help="Pastas ou PDFs de extratos")
+    ap.add_argument("paths", nargs="+", help="Pastas ou arquivos (PDF/OFX/CSV)")
     ap.add_argument("--outdir", default="output", help="Diretório de saída")
     args = ap.parse_args(argv)
 
-    pdfs = collect_pdfs(args.paths)
-    if not pdfs:
-        print("Nenhum PDF encontrado.", file=sys.stderr)
+    sources = collect_sources(args.paths)
+    if not sources:
+        print("Nenhum extrato (.pdf/.ofx/.csv) encontrado.", file=sys.stderr)
         return 1
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
     statements: list[Statement] = []
-    for pdf in pdfs:
-        stmt = parse_statement(pdf)
-        statements.append(stmt)
-        flag = " [OCR]" if stmt.usou_ocr else ""
-        print(f"  {stmt.periodo}  {pdf.name:30s} {len(stmt.transactions):3d} lançamentos{flag}")
+    for src in sources:
+        for stmt in load_source(src):
+            statements.append(stmt)
+            flag = " [OCR]" if stmt.usou_ocr else f" [{src.suffix.lstrip('.').upper()}]"
+            print(f"  {stmt.periodo}  {src.name:30s} "
+                  f"{len(stmt.transactions):3d} lançamentos{flag}")
 
     dq = deduplicate(statements)
     canon = canonical(statements)
