@@ -35,8 +35,10 @@ export class PlaywrightClient extends WhatsAppAdapter {
   private context:  BrowserContext | null = null;
   private page:     Page     | null = null;
   private connected = false;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private polling = false;                 // guarda de reentrância do poll
   private seenKeys  = new Set<string>();
+  private readonly maxSeenKeys = 5_000;    // teto para o cache de dedupe
 
   private sessionDir:     string;
   private headless:       boolean;
@@ -225,15 +227,26 @@ export class PlaywrightClient extends WhatsAppAdapter {
   // ── Message polling ───────────────────────────────────────────────────────
 
   private startPolling(): void {
-    this.pollTimer = setInterval(() => this.pollMessages().catch(console.error), 3000);
+    const interval = Number(process.env.WA_POLL_INTERVAL_MS ?? 3000);
+    // Loop auto-agendado (setTimeout, não setInterval): o próximo ciclo só é
+    // marcado *depois* que o anterior termina. Assim, um poll lento (abrir e
+    // raspar vários chats não lidos) nunca dispara ciclos sobrepostos que se
+    // acumulariam disputando a mesma página.
+    const loop = async (): Promise<void> => {
+      await this.pollMessages().catch(console.error);
+      if (this.connected) this.pollTimer = setTimeout(loop, interval);
+    };
+    this.pollTimer = setTimeout(loop, interval);
   }
 
   private stopPolling(): void {
-    if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
+    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
   }
 
   private async pollMessages(): Promise<void> {
     if (!this.page || !this.connected) return;
+    if (this.polling) return;   // belt-and-suspenders: nunca rodar reentrante
+    this.polling = true;
 
     try {
       // Collect unread chat snippets from sidebar
@@ -247,12 +260,13 @@ export class PlaywrightClient extends WhatsAppAdapter {
         });
       });
 
-      const db = getDb();
       for (const chat of chats.filter(c => c.unread > 0)) {
         await this.openChat(chat.title);
         await this.scrapeOpenChat();
       }
-    } catch { /**/ }
+    } catch { /**/ } finally {
+      this.polling = false;
+    }
   }
 
   private async openChat(nameOrPhone: string): Promise<boolean> {
@@ -291,6 +305,13 @@ export class PlaywrightClient extends WhatsAppAdapter {
         const key = `${m.chatId}|${m.text.slice(0, 80)}|${m.ts}|${m.isFromMe ? 1 : 0}`;
         const isNew = !this.seenKeys.has(key);
         this.seenKeys.add(key);
+        // Mantém o cache de dedupe limitado: o Set preserva ordem de inserção,
+        // então descartamos as chaves mais antigas quando estoura o teto.
+        if (this.seenKeys.size > this.maxSeenKeys) {
+          const drop = this.seenKeys.size - this.maxSeenKeys;
+          let i = 0;
+          for (const k of this.seenKeys) { this.seenKeys.delete(k); if (++i >= drop) break; }
+        }
 
         const id = `wa-${now}-${Math.random().toString(36).slice(2, 6)}`;
         db.prepare(`

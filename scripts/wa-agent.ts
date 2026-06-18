@@ -20,6 +20,7 @@ import { PlaywrightClient } from "../src/adapters/playwright/client.js";
 import { guardAdapter } from "../src/guard.js";
 import { parseCsv, isAuthorized } from "../src/agent-auth.js";
 import { closeDb } from "../src/store/db.js";
+import { Gate } from "../src/concurrency.js";
 import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
 
@@ -49,6 +50,14 @@ const HELP_TEXT = [
 ].join("\n");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Cada /setup dispara um loop agêntico (Claude + bash) de vários segundos.
+// Sem limite, comandos chegando em paralelo de diversas sessões/chats se
+// acumulam e sobrecarregam API e máquina. O Gate faz load shedding: no máximo
+// WA_AGENT_MAX_CONCURRENT em voo no total e um por chat — o excedente é
+// recusado na hora (com aviso ao usuário) em vez de empilhado.
+const MAX_CONCURRENT = Math.max(1, Number(process.env.WA_AGENT_MAX_CONCURRENT ?? 2));
+const gate = new Gate(MAX_CONCURRENT);
 
 // ── Tool execution ────────────────────────────────────────────────────────────
 
@@ -163,9 +172,19 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";
   console.error(`[agent] /setup de ${msg.fromId} (${groupName || msg.chatId}): ${command}`);
 
-  // Ajuda: lista os comandos aceitos sem executar nada.
+  // Ajuda: lista os comandos aceitos sem executar nada (barato, não consome slot).
   if (/^(ajuda|help|\?|comandos)$/i.test(command)) {
     await adapter.sendMessage(msg.chatId, { text: HELP_TEXT }).catch(() => {});
+    return;
+  }
+
+  // Controle de carga: recusa de imediato se já houver um comando rodando neste
+  // chat ou se a capacidade global estiver esgotada. Evita o acúmulo.
+  if (!gate.tryAcquire(msg.chatId)) {
+    const busy = gate.reason(msg.chatId) === "key-busy"
+      ? "⏳ Ainda estou processando seu comando anterior neste chat. Aguarde a resposta."
+      : "⏳ Estou ocupado processando outros comandos agora. Tente novamente em instantes.";
+    await adapter.sendMessage(msg.chatId, { text: busy }).catch(() => {});
     return;
   }
 
@@ -188,6 +207,8 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
         text: `❌ Erro: ${msg2.slice(0, 200)}`,
       });
     } catch { /* give up */ }
+  } finally {
+    gate.release(msg.chatId);
   }
 }
 
