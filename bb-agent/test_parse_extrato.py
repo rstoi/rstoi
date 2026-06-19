@@ -50,9 +50,23 @@ class TestCategorize(unittest.TestCase):
             "Câmbio": "Câmbio",
             "Ordem Bancária": "Ordem Bancária (recebida)",
             "Pagto cartão crédito": "Cartão de crédito",
+            "BOLETO PAGO FORNECEDOR XYZ": "Boletos",
+            "SISPAG SALARIOS": "Folha/Salários (Sispag)",
+            "DA CPFL ENERGIA": "Débito automático",
+            "TBI 0003025-8 MOB": "Transferência interna (TBI)",
+            "PAGAMENTOS TRIB COD BARRAS DARF": "Impostos/Tributos",
+            "RENDIMENTOS REND PAGO APLIC AUT MAIS": "Rendimentos de aplicação",
+            "TAR PIX": "Tarifas bancárias",
         }
         for desc, expected in cases.items():
             self.assertEqual(P.categorize(desc)[0], expected, desc)
+
+    def test_balance_markers_are_dropped(self):
+        # linhas de saldo (não são lançamentos) não viram transação
+        for desc in ("SALDO TOTAL DISPONIVEL DIA", "S A L D O", "Saldo Anterior"):
+            tx = P.make_transaction("x.ofx", "2026-05", "05/05/2026", "",
+                                    desc, "", 48969.47, "C")
+            self.assertIsNone(tx, desc)
 
     def test_internal_flag(self):
         self.assertTrue(P.categorize("BB Rende Fácil")[1])

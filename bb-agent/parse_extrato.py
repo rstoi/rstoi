@@ -122,24 +122,34 @@ def strip_accents(text: str) -> str:
 # (regex sobre descrição sem acento/minúscula, categoria, é_interno)
 CATEGORY_RULES: list[tuple[re.Pattern, str, bool]] = [
     (re.compile(r"saldo anterior"),                 "Saldo anterior", True),
-    (re.compile(r"^s a l d o|^saldo$"),             "Saldo final", True),
+    (re.compile(r"^s a l d o|^saldo$|saldo total|saldo dispon"), "Saldo final", True),
     (re.compile(r"rende facil"),                    "Rende Fácil (interno)", True),
+    # rendimento pago (juros da aplicação) é receita; vem antes do sweep interno
+    (re.compile(r"rendiment|\brend\b"),             "Rendimentos de aplicação", False),
+    (re.compile(r"aplicacao aut|resgate aut|aplic aut"), "Aplicação automática (interno)", True),
     (re.compile(r"pix.*recebido"),                  "Pix recebido", False),
     (re.compile(r"pix.*enviado"),                   "Pix enviado", False),
+    (re.compile(r"\btar |tarifa|cesta"),            "Tarifas bancárias", False),
+    (re.compile(r"\bpix\b"),                        "Pix (outros)", False),
     (re.compile(r"ordem bancaria"),                 "Ordem Bancária (recebida)", False),
-    (re.compile(r"\bted\b|transfer"),               "TED/Transferência", False),
-    (re.compile(r"estorno"),                        "Estornos", False),
-    (re.compile(r"pronampe|bb giro|cap.* giro|capital giro|peac|amortiza|"
-                r"\bfgi\b|ecg garantia|comissao flat"),
+    (re.compile(r"\bted\b|\bdoc\b|transfer"),       "TED/Transferência", False),
+    (re.compile(r"\btbi\b"),                        "Transferência interna (TBI)", False),
+    (re.compile(r"estorno|devolucao"),              "Estornos", False),
+    (re.compile(r"boleto"),                         "Boletos", False),
+    (re.compile(r"sispag|salario|folha de pag"),    "Folha/Salários (Sispag)", False),
+    (re.compile(r"^da |debito autom|deb autor|deb aut|debito direto"),
+                                                    "Débito automático", False),
+    (re.compile(r"pronampe|bb giro|cap.* giro|capital giro|parcela giro|\bgiro\b|"
+                r"peac|amortiza|\bfgi\b|ecg garantia|comissao flat|emprestimo|financ"),
                                                     "Financiamento (Giro/Pronampe/PEAC)", False),
     (re.compile(r"consorcio"),                      "Consórcio", False),
     (re.compile(r"cartao|cartão"),                  "Cartão de crédito", False),
     (re.compile(r"seg cred|seguro|\bseg "),         "Seguros", False),
     (re.compile(r"cambio"),                         "Câmbio", False),
-    (re.compile(r"tarifa"),                         "Tarifas bancárias", False),
     (re.compile(r"i\.?o\.?f|\biof\b|1\.0\.f"),      "IOF", False),
     (re.compile(r"juros"),                          "Juros", False),
-    (re.compile(r"imposto|tribut|darf|\bdas\b"),    "Impostos/Tributos", False),
+    (re.compile(r"imposto|tribut|\btrib\b|darf|\bdas\b|fgts|inss|gps"),
+                                                    "Impostos/Tributos", False),
 ]
 
 
@@ -544,7 +554,7 @@ def write_report(statements: list[Statement], dq: dict, path: Path) -> None:
     tot_deb = sum(-t.valor for t in ext_tx if t.valor < 0)
 
     lines: list[str] = []
-    lines.append("# Banco do Brasil — Relatório consolidado de extratos\n")
+    lines.append("# Relatório consolidado de extratos bancários\n")
     conta = next((s.conta for s in statements if s.conta), "—")
     lines.append(f"**Conta corrente:** {conta}  ")
     lines.append(f"**Extratos processados:** {len(statements)}  ")
