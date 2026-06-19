@@ -108,9 +108,17 @@ class TestLineParsing(unittest.TestCase):
 
 
 class TestDeduplicate(unittest.TestCase):
-    def _stmt(self, arquivo, periodo):
-        return P.Statement(arquivo=arquivo, periodo=periodo, conta="99243-7",
-                           usou_ocr=False)
+    def _stmt(self, arquivo, periodo, conta="99243-7", banco="Banco do Brasil"):
+        return P.Statement(arquivo=arquivo, periodo=periodo, conta=conta,
+                           usou_ocr=False, banco=banco)
+
+    def test_same_month_different_accounts_both_kept(self):
+        stmts = [
+            self._stmt("BB maio 26.pdf", "2026-05"),
+            self._stmt("itau.ofx", "2026-05", conta="0716792452", banco="Itaú"),
+        ]
+        P.deduplicate(stmts)
+        self.assertEqual(len(P.canonical(stmts)), 2)  # contas diferentes não deduplicam
 
     def test_duplicate_period_and_missing_months(self):
         stmts = [

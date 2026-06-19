@@ -108,6 +108,27 @@ def br_to_float(num: str) -> float:
     return float(num.replace(".", "").replace(",", "."))
 
 
+# Código COMPE -> nome do banco (para identificar a origem em OFX/PDF)
+BANK_BY_ID = {
+    "001": "Banco do Brasil", "237": "Bradesco", "341": "Itaú",
+    "104": "Caixa Econômica", "033": "Santander", "077": "Banco Inter",
+    "260": "Nubank", "212": "Banco Original", "336": "C6 Bank",
+    "748": "Sicredi", "756": "Sicoob", "041": "Banrisul", "070": "BRB",
+}
+
+
+def bank_name(bankid: str = "", text: str = "") -> str:
+    """Nome do banco a partir do código COMPE (OFX) ou do texto (PDF)."""
+    key = (bankid or "").lstrip("0").zfill(3)
+    if key in BANK_BY_ID:
+        return BANK_BY_ID[key]
+    low = strip_accents(text)
+    for name in BANK_BY_ID.values():
+        if strip_accents(name) in low:
+            return name
+    return ""
+
+
 def strip_accents(text: str) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", text)
@@ -186,9 +207,15 @@ class Statement:
     periodo: str
     conta: str
     usou_ocr: bool
+    banco: str = ""
     saldo_anterior: float | None = None
     duplicado_de: str | None = None   # nome do arquivo canônico, se este for cópia
     transactions: list[Transaction] = field(default_factory=list)
+
+    @property
+    def chave_conta(self) -> str:
+        """Identifica a conta (banco + número) para consolidação multibanco."""
+        return f"{self.banco or '?'} · {self.conta or '?'}"
 
     @property
     def creditos(self) -> float:
@@ -211,20 +238,27 @@ def parse_statement(pdf_path: Path) -> Statement:
     raw, used_ocr = extract_text(pdf_path)
     lines = [clean_line(l) for l in raw.splitlines() if l.strip()]
 
-    periodo, conta = "", ""
+    periodo = ""
     for l in lines:
         m = PERIODO_RE.search(l)
         if m:
             periodo = f"{m.group(2)}-{m.group(1)}"
-        m = CONTA_RE.search(l)
-        if m and not conta:
-            conta = m.group(1)
     # fallback: deduz período do nome do arquivo se não achou no texto
     if not periodo:
         periodo = _period_from_name(pdf_path.name)
 
+    # conta: rótulo "Conta corrente NNNNN-N"; se o OCR separou rótulo e número,
+    # cai para o primeiro número no formato de conta (5–8 dígitos + dígito).
+    cm = CONTA_RE.search(raw)
+    conta = cm.group(1) if cm else ""
+    if not conta or "-" not in conta:
+        am = re.search(r"(?<!\d)(\d{5,8}-\d)(?!\d)", raw)
+        if am:
+            conta = am.group(1)
+
     stmt = Statement(arquivo=pdf_path.name, periodo=periodo, conta=conta,
-                     usou_ocr=used_ocr)
+                     usou_ocr=used_ocr,
+                     banco=bank_name(text=raw) or "Banco do Brasil")
 
     for l in lines:
         m = TX_RE.match(l)
@@ -316,13 +350,14 @@ def _norm_date(s: str) -> str:
     return f"{d}/{mo}/{y}"
 
 
-def _group_by_month(txs: list[Transaction], arquivo: str, conta: str) -> list[Statement]:
+def _group_by_month(txs: list[Transaction], arquivo: str, conta: str,
+                    banco: str = "") -> list[Statement]:
     stmts: dict[str, Statement] = {}
     for t in txs:
         s = stmts.get(t.periodo)
         if s is None:
             s = Statement(arquivo=arquivo, periodo=t.periodo, conta=conta,
-                          usou_ocr=False)
+                          usou_ocr=False, banco=banco)
             stmts[t.periodo] = s
         s.transactions.append(t)
     return [stmts[k] for k in sorted(stmts)]
@@ -344,6 +379,7 @@ def parse_ofx(path: Path) -> list[Statement]:
     """Lê um arquivo OFX (Money 2000 / OFX 1.x ou 2.x) do BB."""
     content = _read_text(path)
     conta = _ofx_tag(content, "ACCTID")
+    banco = bank_name(_ofx_tag(content, "BANKID"))
     txs: list[Transaction] = []
     for block in content.split("<STMTTRN>")[1:]:
         dt = _ofx_tag(block, "DTPOSTED")[:8]
@@ -358,7 +394,7 @@ def parse_ofx(path: Path) -> list[Statement]:
                               signed, "C" if signed >= 0 else "D")
         if tx:
             txs.append(tx)
-    return _group_by_month(txs, path.name, conta)
+    return _group_by_month(txs, path.name, conta, banco)
 
 
 # rótulos de coluna (sem acento/minúsculo) procurados no cabeçalho do CSV
@@ -426,7 +462,7 @@ def parse_csv(path: Path) -> list[Statement]:
                               signed, dc)
         if tx:
             txs.append(tx)
-    return _group_by_month(txs, path.name, conta)
+    return _group_by_month(txs, path.name, conta, bank_name(text=text))
 
 
 def load_source(path: Path) -> list[Statement]:
@@ -445,48 +481,62 @@ def load_source(path: Path) -> list[Statement]:
 # Saídas
 # ---------------------------------------------------------------------------
 
-def deduplicate(statements: list[Statement]) -> dict:
-    """Marca extratos com período repetido como duplicados (não canônicos).
+def _months_between(periods: list[str]) -> list[str]:
+    periods = sorted(p for p in periods if re.fullmatch(r"\d{4}-\d{2}", p))
+    if not periods:
+        return []
+    sy, sm = map(int, periods[0].split("-"))
+    ey, em = map(int, periods[-1].split("-"))
+    out, y, m = [], sy, sm
+    have = set(periods)
+    while (y, m) <= (ey, em):
+        key = f"{y:04d}-{m:02d}"
+        if key not in have:
+            out.append(key)
+        m += 1
+        if m > 12:
+            y, m = y + 1, 1
+    return out
 
-    Os extratos do BB carregam o período impresso no PDF; quando vários
-    arquivos trazem o mesmo período (ex.: arquivo salvo com o mês errado),
-    apenas o primeiro é considerado canônico para os totais consolidados.
-    Retorna metadados de qualidade de dados (duplicados, meses faltantes).
+
+def deduplicate(statements: list[Statement]) -> dict:
+    """Marca extratos repetidos (mesma conta e período) como não canônicos.
+
+    A dedupe é feita por **conta** (banco + número), de modo que o mesmo mês
+    em contas diferentes (ex.: BB e Itaú em 2026-05) é preservado. Dentro de
+    uma conta, períodos repetidos costumam indicar arquivo salvo com o mês
+    errado; apenas um é considerado canônico. Os meses faltantes são apurados
+    por conta. Retorna metadados de qualidade de dados.
     """
     def name_matches(s: Statement) -> int:
         # 0 = nome do arquivo bate com o período (preferido como canônico)
         return 0 if _period_from_name(s.arquivo) == s.periodo else 1
 
-    by_period: dict[str, list[Statement]] = {}
-    for s in sorted(statements, key=lambda x: (x.periodo, name_matches(x), x.arquivo)):
-        by_period.setdefault(s.periodo, []).append(s)
+    by_acct_period: dict[tuple[str, str], list[Statement]] = {}
+    for s in sorted(statements, key=lambda x: (x.chave_conta, x.periodo,
+                                               name_matches(x), x.arquivo)):
+        by_acct_period.setdefault((s.chave_conta, s.periodo), []).append(s)
 
     duplicates = []
-    for periodo, group in by_period.items():
-        canonical = group[0]
+    for (conta, periodo), group in by_acct_period.items():
+        canon_stmt = group[0]
         for dup in group[1:]:
-            dup.duplicado_de = canonical.arquivo
+            dup.duplicado_de = canon_stmt.arquivo
             duplicates.append({
-                "periodo": periodo,
-                "arquivo": dup.arquivo,
-                "canonico": canonical.arquivo,
+                "conta": conta, "periodo": periodo,
+                "arquivo": dup.arquivo, "canonico": canon_stmt.arquivo,
             })
 
-    periods = sorted(p for p in by_period if re.fullmatch(r"\d{4}-\d{2}", p))
-    missing: list[str] = []
-    if periods:
-        start, end = periods[0], periods[-1]
-        sy, sm = map(int, start.split("-"))
-        ey, em = map(int, end.split("-"))
-        y, m = sy, sm
-        while (y, m) <= (ey, em):
-            key = f"{y:04d}-{m:02d}"
-            if key not in by_period:
-                missing.append(key)
-            m += 1
-            if m > 12:
-                y, m = y + 1, 1
-    return {"duplicados": duplicates, "meses_faltantes": missing}
+    # meses faltantes por conta
+    by_acct: dict[str, list[str]] = {}
+    for s in canonical(statements):
+        by_acct.setdefault(s.chave_conta, []).append(s.periodo)
+    missing_by_acct = {c: _months_between(ps) for c, ps in by_acct.items()}
+    missing_by_acct = {c: ms for c, ms in missing_by_acct.items() if ms}
+    # lista achatada (compatibilidade) — todos os meses faltantes
+    missing = sorted({m for ms in missing_by_acct.values() for m in ms})
+    return {"duplicados": duplicates, "meses_faltantes": missing,
+            "meses_faltantes_por_conta": missing_by_acct}
 
 
 def canonical(statements: list[Statement]) -> list[Statement]:
@@ -509,15 +559,17 @@ def collect_sources(paths: list[str]) -> list[Path]:
 
 
 def write_csv(statements: list[Statement], path: Path) -> int:
-    cols = ["arquivo", "periodo", "data", "historico_cod", "descricao",
-            "documento", "valor", "tipo", "categoria", "interno"]
+    cols = ["banco", "conta", "arquivo", "periodo", "data", "historico_cod",
+            "descricao", "documento", "valor", "tipo", "categoria", "interno"]
+    tx_cols = [c for c in cols if c not in ("banco", "conta")]
     n = 0
     with path.open("w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
         for s in statements:
             for t in s.transactions:
-                row = {k: v for k, v in asdict(t).items() if k in cols}
+                row = {k: v for k, v in asdict(t).items() if k in tx_cols}
+                row["banco"], row["conta"] = s.banco, s.conta
                 w.writerow(row)
                 n += 1
     return n
@@ -529,6 +581,7 @@ def write_summary_json(statements: list[Statement], dq: dict, path: Path) -> Non
         extratos.append({
             "arquivo": s.arquivo,
             "periodo": s.periodo,
+            "banco": s.banco,
             "conta": s.conta,
             "usou_ocr": s.usou_ocr,
             "lancamentos": len(s.transactions),
@@ -546,38 +599,58 @@ def _fmt(v: float) -> str:
 
 
 def write_report(statements: list[Statement], dq: dict, path: Path) -> None:
-    statements = sorted(canonical(statements), key=lambda x: x.periodo)
+    statements = sorted(canonical(statements), key=lambda x: (x.chave_conta, x.periodo))
     all_tx = [t for s in statements for t in s.transactions]
     ext_tx = [t for t in all_tx if not t.interno]
 
     tot_cred = sum(t.valor for t in ext_tx if t.valor > 0)
     tot_deb = sum(-t.valor for t in ext_tx if t.valor < 0)
 
+    # agrupa extratos por conta
+    contas: dict[str, list[Statement]] = {}
+    for s in statements:
+        contas.setdefault(s.chave_conta, []).append(s)
+
     lines: list[str] = []
     lines.append("# Relatório consolidado de extratos bancários\n")
-    conta = next((s.conta for s in statements if s.conta), "—")
-    lines.append(f"**Conta corrente:** {conta}  ")
+    lines.append(f"**Contas:** {len(contas)}  ")
     lines.append(f"**Extratos processados:** {len(statements)}  ")
     lines.append(f"**Lançamentos (excl. movimentações internas):** {len(ext_tx)}\n")
 
-    lines.append("## Resumo geral\n")
+    lines.append("## Resumo geral (consolidado)\n")
     lines.append("| | Valor |")
     lines.append("|---|---:|")
     lines.append(f"| Total de entradas (créditos) | {_fmt(tot_cred)} |")
     lines.append(f"| Total de saídas (débitos) | {_fmt(tot_deb)} |")
     lines.append(f"| **Resultado líquido** | **{_fmt(tot_cred - tot_deb)}** |\n")
 
-    lines.append("## Fluxo de caixa mensal\n")
-    lines.append("| Período | Lançamentos | Entradas | Saídas | Líquido | OCR |")
-    lines.append("|---|---:|---:|---:|---:|:--:|")
-    for s in statements:
-        ocr = "sim" if s.usou_ocr else ""
-        lines.append(
-            f"| {s.periodo} | {len(s.transactions)} | {_fmt(s.creditos)} | "
-            f"{_fmt(s.debitos)} | {_fmt(s.liquido)} | {ocr} |"
-        )
+    lines.append("## Resumo por banco / conta\n")
+    lines.append("| Banco · Conta | Período | Extratos | Entradas | Saídas | Líquido |")
+    lines.append("|---|---|---:|---:|---:|---:|")
+    for chave, group in sorted(contas.items()):
+        pers = sorted(s.periodo for s in group)
+        cred = sum(s.creditos for s in group)
+        deb = sum(s.debitos for s in group)
+        cobertura = f"{pers[0]} … {pers[-1]}" if pers else "—"
+        lines.append(f"| {chave} | {cobertura} | {len(group)} | "
+                     f"{_fmt(cred)} | {_fmt(deb)} | {_fmt(cred - deb)} |")
+    lines.append("")
 
-    lines.append("\n## Total por categoria\n")
+    lines.append("## Fluxo de caixa mensal (consolidado)\n")
+    lines.append("| Período | Contas | Lançamentos | Entradas | Saídas | Líquido |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    by_month: dict[str, list[Statement]] = {}
+    for s in statements:
+        by_month.setdefault(s.periodo, []).append(s)
+    for periodo in sorted(by_month):
+        grp = by_month[periodo]
+        cred = sum(s.creditos for s in grp)
+        deb = sum(s.debitos for s in grp)
+        nlan = sum(len(s.transactions) for s in grp)
+        lines.append(f"| {periodo} | {len(grp)} | {nlan} | "
+                     f"{_fmt(cred)} | {_fmt(deb)} | {_fmt(cred - deb)} |")
+
+    lines.append("\n## Total por categoria (consolidado)\n")
     cats: dict[str, dict[str, float]] = {}
     for t in ext_tx:
         c = cats.setdefault(t.categoria, {"in": 0.0, "out": 0.0, "n": 0})
@@ -598,25 +671,31 @@ def write_report(statements: list[Statement], dq: dict, path: Path) -> None:
                  "linhas de saldo são tratadas como internas e excluídas dos totais "
                  "de fluxo de caixa.\n")
 
-    dups, missing = dq.get("duplicados", []), dq.get("meses_faltantes", [])
-    if dups or missing:
+    dups = dq.get("duplicados", [])
+    missing_acct = dq.get("meses_faltantes_por_conta", {})
+    if dups or missing_acct:
         lines.append("## ⚠️ Qualidade dos dados\n")
         if dups:
-            lines.append("**Arquivos com período duplicado** (provável nome de mês "
-                         "errado — desconsiderados dos totais para não contar em "
-                         "dobro):\n")
-            lines.append("| Período | Arquivo duplicado | Considerado (canônico) |")
-            lines.append("|---|---|---|")
+            lines.append("**Arquivos com período duplicado na mesma conta** (provável "
+                         "nome de mês errado — desconsiderados dos totais para não "
+                         "contar em dobro):\n")
+            lines.append("| Conta | Período | Arquivo duplicado | Considerado (canônico) |")
+            lines.append("|---|---|---|---|")
             for d in dups:
-                lines.append(f"| {d['periodo']} | {d['arquivo']} | {d['canonico']} |")
+                lines.append(f"| {d.get('conta','—')} | {d['periodo']} | "
+                             f"{d['arquivo']} | {d['canonico']} |")
             lines.append("")
-        if missing:
-            lines.append(f"**Meses sem extrato no intervalo:** {', '.join(missing)}\n")
+        if missing_acct:
+            lines.append("**Meses sem extrato (por conta):**\n")
+            for conta, ms in sorted(missing_acct.items()):
+                lines.append(f"- {conta}: {', '.join(ms)}")
+            lines.append("")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="Agente de extratos do Banco do Brasil")
+    ap = argparse.ArgumentParser(
+        description="Agente de extratos bancários (BB, Itaú e outros) — PDF/OFX/CSV")
     ap.add_argument("paths", nargs="+", help="Pastas ou arquivos (PDF/OFX/CSV)")
     ap.add_argument("--outdir", default="output", help="Diretório de saída")
     args = ap.parse_args(argv)

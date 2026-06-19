@@ -40,6 +40,20 @@ relatório consolidado.
 > Sempre que possível, prefira **OFX ou CSV**: são estruturados, dispensam OCR e
 > são mais confiáveis que o PDF.
 
+## Multibanco (consolidação por conta)
+
+Embora seja o "agente do BB", o leitor de OFX/CSV é agnóstico de banco — dá para
+jogar extratos de **vários bancos** (ex.: BB + Itaú) no mesmo comando:
+
+```bash
+python3 parse_extrato.py "BB 2025" "BB 2026" extrato-itau.ofx --outdir output
+```
+
+O agente identifica o banco (código COMPE no OFX ou nome no PDF), **deduplica por
+conta** (mesmo mês em bancos diferentes não some) e o `relatorio.md` traz:
+**Resumo por banco/conta**, **fluxo de caixa mensal consolidado** (somando as
+contas) e meses faltantes apurados por conta.
+
 ## Saídas (em `--outdir`, padrão `output/`)
 
 | Arquivo | Conteúdo |
