@@ -39,3 +39,17 @@ export const MODULES: ModuleDef[] = [
 export function moduleById(id: string): ModuleDef | undefined {
   return MODULES.find((m) => m.id === id);
 }
+
+/** Papéis que liberam abas sensíveis (Terminal, Claude CLI, Governança). */
+export const OPERATOR_ROLES = ["operador", "admin"];
+
+/** Um módulo é visível se não é sensível, ou se o usuário tem papel de operador. */
+export function canSee(m: ModuleDef, roles: Set<string>): boolean {
+  if (!m.sensitive) return true;
+  return OPERATOR_ROLES.some((r) => roles.has(r));
+}
+
+/** Lista de módulos visíveis dado o conjunto de papéis do usuário. */
+export function visibleModules(roles: Set<string>): ModuleDef[] {
+  return MODULES.filter((m) => canSee(m, roles));
+}

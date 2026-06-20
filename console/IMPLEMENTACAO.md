@@ -56,4 +56,18 @@ registradas aqui com a forma de contorno adotada para prosseguir.
 - Teste: conexão a `/pty` com token inválido é recusada com **close code 4401**
   e mensagem `token inválido`. Confirma deny-by-default das sessões de shell.
 
-### Próximo — Passo 7: `firebase.json` + config de Hosting; Passo 8: testes (vitest).
+### Passo 7 — Config de deploy (Firebase Hosting + Cloud Run)
+- Status: ✅ concluído.
+- Artefatos: `console/web/firebase.json` (Hosting → `out/`, SPA rewrite, cache de
+  assets), `console/web/.firebaserc`, `console/DEPLOY.md` (passo a passo de
+  Cloud Run + Hosting + restrição de domínio em camadas).
+
+### Passo 8 — Testes automatizados (vitest)
+- Status: ✅ concluído.
+- Refatoração: `gateway/src/auth.ts` expõe `applyPolicy` puro (domínio+RBAC);
+  `web/src/lib/modules.ts` expõe `canSee`/`visibleModules`; `Console.tsx` usa-os.
+- Testes: gateway **4/4** (aceita @setup.com.br verificado, recusa outro domínio,
+  recusa e-mail não verificado, bloqueia shell sem papel de operador);
+  frontend **3/3** (RBAC das abas sensíveis). Typecheck e build refeitos: OK.
+
+### Próximo — Passo 9: integração dos painéis de serviço com os MCP servers.
