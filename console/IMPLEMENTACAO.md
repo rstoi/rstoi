@@ -119,6 +119,24 @@ está preparado para recebê-las sem redesenho:
   Build, ou configurar os secrets de WIF no GitHub. **Não dá para resolver sem
   credenciais/projeto.**
 
+## Execução do deploy real — veredito técnico (registro)
+- Decisão do usuário: "você executa, eu forneço credenciais".
+- **Diagnóstico de rede do sandbox:** APIs do GCP **alcançáveis**
+  (`run.googleapis.com`→401, `oauth2`→400, `firebasehosting`/`artifactregistry`/
+  `cloudbuild`→404, `storage`→400), porém **hosts de distribuição de software do
+  Google bloqueados** (`dl.google.com`, `sdk.cloud.google.com`,
+  `packages.cloud.google.com` → **403**). Sem **docker daemon**.
+- **Conclusão:** o bloqueio é de **ferramentas**, não de credencial — não é
+  possível instalar o `gcloud` nem construir o container do Cloud Run aqui. Logo,
+  **fornecer credenciais não destrava o deploy** a partir deste sandbox; só
+  exporia um segredo corporativo no transcript. Por isso **não foram coletadas
+  credenciais**.
+- **Caminho viável (preparado e commitado):** executar a automação em ambiente
+  com tooling — (a) `console/scripts/deploy.sh` na máquina do usuário após
+  `gcloud auth login` (guiado ao vivo), ou (b) `.github/workflows/deploy-console.yml`
+  (GitHub Actions/WIF), ou (c) `console/cloudbuild.yaml` (Cloud Build). Todos usam
+  `gcloud run deploy --source` (build no Cloud Build, sem docker local).
+
 ## Resumo final
 - **10/10 passos** executados, cada um testado e confirmado.
 - **10 testes automatizados** passando (gateway 7, web 3); ambos os pacotes
