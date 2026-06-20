@@ -233,5 +233,67 @@ contratadas** e move a infra de apoio para o **free tier do Google Cloud**.
 
 ---
 
+## 8. setupOS Cloud — console único (web app)
+
+Uma **interface web única** reúne, em um só lugar, o painel de controle, um
+terminal operável, o **Claude CLI** e os principais serviços — atrás de **login
+Google restrito ao domínio setup.com.br**. Roda no mesmo stack econômico
+(Firebase Hosting + Cloud Run + MCP), reaproveitando o `status-dashboard.html`
+como semente do Painel. O scaffold inicial está em `console/` (web + gateway).
+
+### Layout (workspace tipo "cloud desktop")
+- **Top bar:** logo, busca global (e-mails, arquivos, conversas, PRs via MCP),
+  seletor de ambiente, notificações (FCM) e usuário logado.
+- **Navegação (esquerda):** módulos; clicar abre/foca uma aba.
+- **Área de trabalho (centro):** abas reordenáveis/fecháveis, com *split view*
+  (ex.: Terminal + Claude CLI lado a lado).
+- **Painel contextual (direita):** fila de **aprovações human-in-the-loop**,
+  atividade dos agentes, custo do mês e alertas.
+
+### Janelas principais
+| Janela | O que faz | Origem |
+|---|---|---|
+| **Painel** | Saúde dos MCP, status dos agentes, custo, aprovações | evolução do `status-dashboard.html` |
+| **Terminal** | Terminal web (xterm.js) por WebSocket a uma sessão *pty* | Cloud Run gateway + node-pty |
+| **Claude CLI** | Claude Code interativo, loop e aprovações ao vivo | Claude Pro/Max |
+| **WhatsApp** | Conversas, enviar/responder/encaminhar | MCP `whatsapp-business` |
+| **Gmail / Calendar / Drive** | Triagem, agenda, arquivos | MCP Google Workspace |
+| **GitHub** | PRs, CI, issues, revisões | MCP `github` |
+| **Projetos / Contratos / Comercial** | Sistemas internos embutidos | conectores MCP existentes |
+| **Agentes / Governança** | Catálogo de agentes; auditoria, permissões, custo | Claude Code + Cloud Audit Logs |
+
+### Login — Google Auth, somente setup.com.br
+- **Firebase Auth + Google OAuth** com `hd=setup.com.br` (conveniência na UI).
+- **Validação obrigatória no backend** (Cloud Run): rejeita token sem
+  `email_verified` ou cujo domínio ≠ `setup.com.br` — a verdade é checada no
+  servidor, não no cliente.
+- **IAP** na frente do Cloud Run liberando só o grupo do **Cloud Identity**.
+- **RBAC por grupo do Workspace:** abas sensíveis (Terminal, Claude CLI,
+  Governança) só aparecem para grupos autorizados — reusa a allowlist que já
+  existe no projeto (`WA_AGENT_GROUPS`).
+
+```
+Usuário → Firebase Auth (Google, hd=setup.com.br)
+        → Cloud Run verifica ID token: email_verified && domínio==setup.com.br
+        → IAP (grupo Cloud Identity) → libera o console
+        → RBAC por grupo decide quais abas/ações o usuário enxerga
+```
+
+### Stack (coerente com a versão sem Vertex)
+| Camada | Tecnologia | Custo |
+|---|---|---|
+| Frontend (PWA, abas, xterm.js) | React/Next.js em Firebase Hosting | Spark grátis |
+| Auth | Firebase Auth (Google) + IAP | grátis / US$ 0 |
+| Gateway WebSocket + REST/SSE | Cloud Run (node-pty, ponte MCP) | free tier → baixo |
+| Tempo real / estado | Firestore + Pub/Sub + FCM | free tier |
+| Terminal & Claude CLI | *pty* no host/Cloud Run + Claude Code | já contratado |
+| Serviços | MCP servers já existentes | reuso |
+
+O console é apenas uma "casca" web unificada sobre os MCP servers e o Claude Code
+que já existem, com login corporativo e governança por padrão — **sem novo custo
+de modelo**.
+
+---
+
 *Documento vivo. Atualize conforme novos conectores MCP, agentes e medições de
 custo entram em produção.*
