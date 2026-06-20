@@ -1,0 +1,53 @@
+# Pipeline de implantação do setupOS Cloud no Cloud Build.
+# Dispara o deploy real em ambiente GCP autenticado (sem docker/gcloud local).
+#
+# Uso:
+#   gcloud builds submit --config console/cloudbuild.yaml \
+#     --substitutions=_REGION=southamerica-east1,_DOMAIN=setup.com.br
+#
+# A service account do Cloud Build precisa de: run.admin, iam.serviceAccountUser,
+# firebasehosting.admin e artifactregistry.writer.
+substitutions:
+  _REGION: southamerica-east1
+  _DOMAIN: setup.com.br
+  _OPERATOR_ROLES: "operador,admin"
+
+steps:
+  # 1) Gateway → Cloud Run (Cloud Build constrói o container a partir do source).
+  - id: deploy-gateway
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud run deploy setupos-gateway \
+          --source console/gateway \
+          --region "$_REGION" \
+          --no-allow-unauthenticated \
+          --set-env-vars "ALLOWED_DOMAIN=$_DOMAIN,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,OPERATOR_ROLES=$_OPERATOR_ROLES"
+
+  # 2) Frontend → build estático apontando para a URL do gateway.
+  - id: build-web
+    name: node:22
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        GATEWAY_URL="$(gcloud run services describe setupos-gateway \
+          --region "$_REGION" --format='value(status.url)')"
+        cd console/web && npm ci
+        NEXT_PUBLIC_GATEWAY_URL="$GATEWAY_URL" npm run build
+
+  # 3) Frontend → Firebase Hosting.
+  - id: deploy-hosting
+    name: node:22
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        cd console/web && npx --yes firebase-tools deploy \
+          --only hosting --project "$PROJECT_ID" --non-interactive
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1800s

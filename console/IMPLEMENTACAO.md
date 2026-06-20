@@ -100,6 +100,25 @@ está preparado para recebê-las sem redesenho:
    conectores marcados `ready`/`pending` no registro; Painel mostra a saúde;
    embeds reais entram quando os MCP servers estiverem expostos ao gateway.
 
+## Implantação real no GCP — tentativa e bloqueio (registro)
+- **Objetivo:** executar o deploy real (Cloud Run + Firebase Hosting).
+- **Diagnóstico do ambiente (sandbox):** `gcloud`, `firebase` e `gh` ausentes;
+  sem credenciais (`GOOGLE_APPLICATION_CREDENTIALS`/projeto vazios); **docker
+  daemon indisponível**. Logo, **não é possível executar o deploy real daqui** —
+  ele exige identidade GCP autenticada e um projeto com billing.
+- **Forma de prosseguir (sem interromper):** automação turnkey commitada, que
+  executa o deploy real em ambiente autenticado, usando `gcloud run deploy
+  --source` (build no Cloud Build — dispensa docker local):
+  - `console/scripts/setup-gcp.sh` — habilita APIs + Artifact Registry (idempotente).
+  - `console/scripts/deploy.sh` — gateway → Cloud Run, frontend → Hosting.
+  - `console/cloudbuild.yaml` — pipeline Cloud Build.
+  - `.github/workflows/deploy-console.yml` — deploy via GitHub Actions (WIF).
+  - Validados: `bash -n` OK; YAML sem tabs/consistente.
+- **Pendência bloqueadora (decisão do usuário):** fornecer acesso GCP — escolher
+  entre rodar os scripts após `gcloud auth login`, conectar o repo ao Cloud
+  Build, ou configurar os secrets de WIF no GitHub. **Não dá para resolver sem
+  credenciais/projeto.**
+
 ## Resumo final
 - **10/10 passos** executados, cada um testado e confirmado.
 - **10 testes automatizados** passando (gateway 7, web 3); ambos os pacotes

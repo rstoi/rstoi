@@ -1,0 +1,41 @@
+# Implantação real do setupOS Cloud via GitHub Actions (acionada manualmente).
+# Autentica no GCP por Workload Identity Federation (sem chaves de longa duração)
+# e roda o pipeline do Cloud Build, que faz o deploy de gateway + frontend.
+name: deploy-console
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_id:
+        description: "ID do projeto GCP"
+        required: true
+      region:
+        description: "Região"
+        required: false
+        default: southamerica-east1
+
+permissions:
+  contents: read
+  id-token: write # necessário para Workload Identity Federation
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          # Configure estes secrets no repositório (Settings > Secrets):
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOY_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Cloud Build deploy
+        run: |
+          gcloud builds submit \
+            --project "${{ inputs.project_id }}" \
+            --config console/cloudbuild.yaml \
+            --substitutions=_REGION="${{ inputs.region }}",_DOMAIN=setup.com.br
