@@ -32,8 +32,28 @@ registradas aqui com a forma de contorno adotada para prosseguir.
   `/bin/echo` e capturou a saída via pty (`PTY_OUTPUT: "setupos-pty-ok"`).
 - Observação: avisos de `uuid` deprecado (transitivo do firebase-admin) — inócuos.
 
-### Próximo — Passo 3: build do frontend (`next build`, export estático).
+### Nota de execução — agendador indisponível
+- `ScheduleWakeup`/`CronCreate` não existem neste ambiente remoto, então o /loop
+  não consegue reagendar disparos. Para não interromper, a implementação segue
+  **continuamente na mesma sessão**, um passo por vez, com teste e registro.
 
-## Pendências registradas
-- _(nenhuma até aqui)_ — instalações e builds nativos funcionaram sem necessidade
-  de interação.
+### Passo 3 — Build do frontend (`next build`, export estático)
+- Status: ✅ concluído.
+- Teste: `next build` compilou e gerou export estático (rota `/` 124 kB First
+  Load JS); import dinâmico do xterm e CSS funcionaram no build. **EXIT=0**.
+
+### Passo 4 — Build do gateway (`tsc`)
+- Status: ✅ concluído.
+- Teste: `tsc` emitiu `dist/{auth,index,pty}.js`. **EXIT=0**.
+
+### Passo 5 — Smoke do gateway (HTTP health)
+- Status: ✅ concluído.
+- Teste: servidor sobe sem credenciais Firebase; `GET /healthz` e `GET /`
+  retornam `{"ok":true,"service":"setupos-gateway"}`.
+
+### Passo 6 — Auth do WebSocket (deny por padrão)
+- Status: ✅ concluído.
+- Teste: conexão a `/pty` com token inválido é recusada com **close code 4401**
+  e mensagem `token inválido`. Confirma deny-by-default das sessões de shell.
+
+### Próximo — Passo 7: `firebase.json` + config de Hosting; Passo 8: testes (vitest).
