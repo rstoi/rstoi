@@ -70,4 +70,39 @@ registradas aqui com a forma de contorno adotada para prosseguir.
   recusa e-mail não verificado, bloqueia shell sem papel de operador);
   frontend **3/3** (RBAC das abas sensíveis). Typecheck e build refeitos: OK.
 
-### Próximo — Passo 9: integração dos painéis de serviço com os MCP servers.
+### Passo 9 — Integração dos painéis com os conectores
+- Status: ✅ concluído (camada de contrato + saúde; dados ao vivo pendentes).
+- Artefatos: `gateway/src/connectors.ts` (registro + `summarize`), endpoint
+  `GET /connectors` (autenticado, CORS), `web/src/lib/gateway.ts` →
+  `fetchConnectors`, `DashboardPane` exibindo a saúde real com fallback demo.
+- Testes: gateway **7/7** (auth 4 + conectores 3); `/connectors` retorna **401**
+  sem token válido; frontend **3/3**; typecheck e build OK.
+
+### Passo 10 — Revisão final
+- Status: ✅ concluído.
+- Resultado: frontend e gateway **compilam, passam nos testes (10 no total) e
+  fazem build**; deploy documentado; segurança (login só @setup.com.br + RBAC)
+  testada de ponta a ponta no que independe de credencial real.
+
+## Pendências (exigem ação humana / credenciais — registradas para prosseguir)
+Estas dependem de recursos externos que não existem neste sandbox. O código já
+está preparado para recebê-las sem redesenho:
+
+1. **Projeto Firebase/GCP real** (`setupos-cloud`) + chaves no
+   `console/web/.env.local` e habilitar provedor Google no Firebase Auth.
+   *Contorno adotado:* modo demonstração funcional sem credenciais.
+2. **Service account do gateway** (ADC) com permissão de verificar ID tokens.
+   *Contorno:* caminho de recusa (deny) testado; caminho de aceite valida ao ter ADC.
+3. **Deploy real** (Cloud Run + Firebase Hosting + IAP). *Contorno:* `DEPLOY.md`
+   com os comandos; builds gerados localmente.
+4. **Dados ao vivo dos serviços** (WhatsApp/Workspace/GitHub via MCP) e **URLs/
+   credenciais dos sistemas internos** (projetos/contratos/comercial). *Contorno:*
+   conectores marcados `ready`/`pending` no registro; Painel mostra a saúde;
+   embeds reais entram quando os MCP servers estiverem expostos ao gateway.
+
+## Resumo final
+- **10/10 passos** executados, cada um testado e confirmado.
+- **10 testes automatizados** passando (gateway 7, web 3); ambos os pacotes
+  compilam, typecheck limpo e build OK.
+- Itens que dependem de credenciais/infra externos ficam registrados acima como
+  pendências, com o contorno usado para não interromper.

@@ -5,16 +5,45 @@ import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { verify, requireOperator } from "./auth.js";
 import { attachPty } from "./pty.js";
+import { CONNECTORS, summarize } from "./connectors.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
+const CORS = {
+  "access-control-allow-origin": process.env.ALLOWED_ORIGIN ?? "*",
+  "access-control-allow-headers": "authorization,content-type",
+};
 
-const server = createServer((req, res) => {
-  if (req.url === "/" || req.url === "/healthz") {
-    res.writeHead(200, { "content-type": "application/json" });
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url ?? "", "http://localhost");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, CORS);
+    res.end();
+    return;
+  }
+
+  if (url.pathname === "/" || url.pathname === "/healthz") {
+    res.writeHead(200, { "content-type": "application/json", ...CORS });
     res.end(JSON.stringify({ ok: true, service: "setupos-gateway" }));
     return;
   }
-  res.writeHead(404);
+
+  // Catálogo de conectores + saúde — autenticado (qualquer conta @setup.com.br).
+  if (url.pathname === "/connectors") {
+    const token = url.searchParams.get("token") ?? "";
+    try {
+      await verify(token);
+    } catch (e) {
+      res.writeHead(401, { "content-type": "application/json", ...CORS });
+      res.end(JSON.stringify({ error: (e as Error).message }));
+      return;
+    }
+    res.writeHead(200, { "content-type": "application/json", ...CORS });
+    res.end(JSON.stringify({ connectors: CONNECTORS, summary: summarize() }));
+    return;
+  }
+
+  res.writeHead(404, CORS);
   res.end();
 });
 
