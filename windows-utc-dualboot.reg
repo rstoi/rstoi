@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+; Faz o Windows tratar o relogio do hardware (RTC/BIOS) como UTC,
+; para conviver com o Ubuntu em dual boot sem a hora ficar errada.
+; Apos importar, reinicie o Windows.
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation]
+"RealTimeIsUniversal"=dword:00000001
