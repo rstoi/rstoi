@@ -8,6 +8,7 @@
     "whatsapp-mcp": "dist/index.js"
   },
   "scripts": {
+    "ctl":           "tsx scripts/ctl.ts",
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
