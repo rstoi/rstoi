@@ -149,25 +149,12 @@ function startService(svc) {
   const existing = readPid(svc.id);
   if (isAlive(existing)) return { ok: false, error: `Já rodando (PID ${existing})` };
 
-  const lf = logFile(svc.id);
-  const { createWriteStream } = await import("fs").then ? { createWriteStream: (p, o) => { const fs = { createWriteStream: null }; try { fs.createWriteStream = (await import("fs")).createWriteStream; } catch {} return fs.createWriteStream(p, o); } } : require("fs");
-
-  // Use sync append stream via file descriptor
-  const fd = require ? null : null;
-  let out;
-  try {
-    const fsSync = { createWriteStream: (await import("fs").catch(() => ({ createWriteStream: null }))).createWriteStream };
-    out = fsSync.createWriteStream?.(lf, { flags: "a" });
-  } catch {
-    out = "ignore";
-  }
-
   const env = { ...process.env, ...(svc.env ?? {}) };
   let child;
   try {
     child = spawn(svc.cmd, svc.args, {
       cwd: svc.cwd, env, detached: true,
-      stdio: ["ignore", "ignore", "ignore"],
+      stdio: "ignore",
     });
   } catch (e) {
     return { ok: false, error: e.message };

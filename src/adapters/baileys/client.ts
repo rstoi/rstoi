@@ -20,10 +20,17 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   type WASocket,
   type proto,
-  type BaileysEventMap,
   Browsers,
 } from "@whiskeysockets/baileys";
 import { useMultiFileAuthState } from "@whiskeysockets/baileys";
+
+// Minimal pino-compatible silent logger for Baileys
+const silentLogger = {
+  level: "silent",
+  trace: () => {}, debug: () => {}, info: () => {},
+  warn:  () => {}, error: () => {}, fatal: () => {},
+  child: () => silentLogger,
+};
 import { Boom } from "@hapi/boom";
 import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
@@ -78,7 +85,7 @@ export class BaileysClient extends WhatsAppAdapter {
       },
       browser: Browsers.ubuntu("Claude Agent"),
       printQRInTerminal: true,
-      logger: { level: "silent" } as never,
+      logger: silentLogger as never,
       syncFullHistory: false,
       markOnlineOnConnect: false,
     });
