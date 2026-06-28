@@ -334,6 +334,26 @@ app.post("/api/exec/stream", (req, res) => {
   req.on("close", () => child.kill());
 });
 
+// ── GET /qr ── live QR code page ──────────────────────────────────────────────
+
+app.get("/qr", (_req, res) => {
+  const qrPath = join(PROJECT, "data/qr.png");
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>WhatsApp QR</title>
+<meta http-equiv="refresh" content="5">
+<style>body{background:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;color:#eee}
+img{width:280px;height:280px;image-rendering:pixelated;border:8px solid white;border-radius:12px}
+p{margin-top:16px;font-size:14px;color:#aaa}</style></head>
+<body><img src="/qr.png?t=${Date.now()}" alt="QR Code"><p>Escaneie com WhatsApp → Aparelhos conectados → Conectar aparelho<br>Esta página atualiza a cada 5s</p></body></html>`);
+});
+
+app.get("/qr.png", (_req, res) => {
+  const qrPath = join(PROJECT, "data/qr.png");
+  if (!existsSync(qrPath)) return res.status(404).send("QR not ready");
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile(qrPath);
+});
+
 // ── GET / ─────────────────────────────────────────────────────────────────────
 
 app.get("/", (_req, res) => res.sendFile(join(__dirname, "status-dashboard.html")));
