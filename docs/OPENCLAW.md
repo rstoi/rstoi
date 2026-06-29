@@ -91,6 +91,62 @@ o agente foi validado até o limite de autenticação do modelo. Para uso real:
 | Inferência ao vivo | ✖ sem chave de LLM disponível no sandbox |
 | Canais de mensagem | ✖ sem credenciais no sandbox |
 
+## Integração com WhatsApp
+
+O WhatsApp **não vem embutido** — é um plugin separado, e o canal usa
+**WhatsApp Web (pareamento por QR)**. Funciona com o seu próprio número
+(recomenda-se um aparelho/eSIM separado).
+
+### 1. Instalar o plugin
+
+```bash
+# ClawHub (preferido) — requer acesso a clawhub.ai
+openclaw plugins install clawhub:@openclaw/whatsapp
+# Alternativa por npm (usada neste ambiente, pois clawhub.ai estava bloqueado):
+openclaw plugins install @openclaw/whatsapp
+```
+
+Reinicie o Gateway para carregar o plugin:
+`openclaw gateway run --force --port 18789`
+
+### 2. Configurar e habilitar o canal
+
+```bash
+openclaw channels add --channel whatsapp --name "WhatsApp pessoal"
+openclaw channels list --all | grep -i whatsapp
+# => WhatsApp default: installed, configured, enabled, not linked
+```
+
+### 3. Parear (QR)
+
+```bash
+openclaw channels login --channel whatsapp
+# Mostra um QR no terminal. No celular:
+# WhatsApp > Aparelhos conectados > Conectar um aparelho > escanear o QR
+```
+
+Após o scan, o estado vira `linked` e o canal conecta. Verifique:
+`openclaw channels status --probe`.
+
+> **Importante — só QR.** Esta versão do plugin (`@openclaw/whatsapp`
+> 2026.6.10) implementa **apenas pareamento por QR**; não há fluxo de
+> *pairing code* por número (`requestPairingCode` não é usado no plugin).
+>
+> **Não funciona em ambiente efêmero.** O QR expira em ~20s e o vínculo
+> exige um Gateway de vida longa. Em containers recicláveis (como o
+> "Claude Code on the web"), o pareamento se perde a cada restart — faça
+> isto em um **host permanente** (servidor/VM dedicada com o Gateway
+> rodando como serviço).
+
+### Estado neste ambiente
+
+| Passo | Resultado |
+|---|---|
+| Plugin `@openclaw/whatsapp` (npm) | ✔ instalado, enabled (0 erros) |
+| `channels add --channel whatsapp` | ✔ configured, enabled |
+| `channels login` (QR) | ✔ gera QR ao vivo (refresh ~20s) |
+| Pareamento concluído (`linked`) | ✖ requer scan em host permanente |
+
 ## Comandos úteis
 
 ```bash
