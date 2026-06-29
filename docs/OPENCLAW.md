@@ -147,6 +147,63 @@ Após o scan, o estado vira `linked` e o canal conecta. Verifique:
 | `channels login` (QR) | ✔ gera QR ao vivo (refresh ~20s) |
 | Pareamento concluído (`linked`) | ✖ requer scan em host permanente |
 
+## Ponte: comandos do WhatsApp → agentes do repo
+
+Os comandos recebidos no WhatsApp são **interpretados pelos agentes deste
+repositório** (não pelo agente interno do OpenClaw). O OpenClaw atua só como
+**transporte**: ele segura a conexão do WhatsApp e expõe os canais por MCP.
+
+```
+WhatsApp ──> OpenClaw (canal linked) ──MCP──> ponte do repo ──> Claude+bash ──> resposta
+                                                (interpret.ts)         │
+            <───────────────── messages_send <─────────────────────────┘
+```
+
+Peças:
+- `src/agent/interpret.ts` — o "cérebro": interpreta o comando via Claude
+  (Anthropic) com ferramenta `bash`. Compartilhado entre `wa-agent.ts` e a ponte.
+- `scripts/openclaw-bridge.ts` (`npm run bridge`) — conecta no `openclaw mcp serve`,
+  recebe inbound (`events_wait`), filtra `/setup …` de remetentes/grupos
+  autorizados, chama o interpretador e responde via `messages_send`.
+
+### Como rodar
+
+```bash
+# 1) Gateway no ar + WhatsApp pareado (linked)
+openclaw gateway run --force --port 18789 &
+
+# 2) O cliente MCP precisa de escopo operator no gateway (aprovar 1x):
+#    no dashboard do OpenClaw ou: openclaw devices approve <requestId>
+#    (em host dedicado/loopback, pode-se habilitar
+#     gateway.nodes.pairing.autoApproveCidrs — decisão de segurança do operador)
+
+# 3) Credenciais e autorização (deny por padrão)
+export ANTHROPIC_API_KEY=sk-ant-...
+export CLAUDE_MODEL=<id de um modelo Claude da Anthropic>
+export WA_AGENT_ALLOWED_SENDERS="+5519982067606"   # ou WA_AGENT_GROUPS
+
+# 4) Sobe a ponte
+npm run bridge
+```
+
+No WhatsApp, envie `/setup <pedido>` (ex.: `/setup rode os testes`). A ponte
+interpreta e responde o resultado.
+
+> **Pré-requisitos de config do gateway:** `gateway.remote.url` e
+> `gateway.remote.token` devem apontar para o gateway local (a ponte usa
+> `openclaw mcp serve`, que conecta como cliente). O token é lido de
+> `~/.openclaw/openclaw.json`.
+
+### Estado neste ambiente (sandbox efêmero)
+
+| Item | Estado |
+|---|---|
+| Código (`interpret.ts` + `openclaw-bridge.ts`) | ✔ escrito, typecheck limpo, 48 testes OK |
+| MCP do OpenClaw (`events_wait`/`messages_send`) | ✔ ferramentas confirmadas |
+| Aprovação de escopo operator do cliente MCP | ✖ pendente (deadlock de bootstrap headless; resolve-se 1x no dashboard) |
+| `ANTHROPIC_API_KEY` p/ interpretar | ✖ ausente no sandbox |
+| Teste ponta-a-ponta ao vivo | ✖ requer os dois itens acima + host permanente |
+
 ## Comandos úteis
 
 ```bash

@@ -14,16 +14,14 @@
  * Ou:  ANTHROPIC_API_KEY=sk-ant-... WA_ADAPTER=playwright tsx scripts/wa-agent.ts
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-import { execSync } from "child_process";
 import { PlaywrightClient } from "../src/adapters/playwright/client.js";
 import { guardAdapter } from "../src/guard.js";
 import { parseCsv, isAuthorized } from "../src/agent-auth.js";
+import { interpretCommand } from "../src/agent/interpret.js";
 import { closeDb } from "../src/store/db.js";
 import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
 
-const PROJECT_DIR = process.env.PROJECT_DIR ?? "/home/user/rstoi";
 const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-4-8";
 const CMD_PREFIX = "/setup";
 const MAX_REPLY_LEN = 3800;
@@ -47,104 +45,6 @@ const HELP_TEXT = [
   "",
   "ℹ️ Funciona apenas nos grupos autorizados e para membros deles.",
 ].join("\n");
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// ── Tool execution ────────────────────────────────────────────────────────────
-
-function runBash(command: string): string {
-  try {
-    const out = execSync(command, {
-      cwd: PROJECT_DIR,
-      timeout: 60_000,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return out.trim() || "(sem saída)";
-  } catch (err: unknown) {
-    const e = err as { stdout?: string; stderr?: string; message?: string };
-    const detail = [e.stdout, e.stderr, e.message].filter(Boolean).join("\n").trim();
-    return `ERRO: ${detail || "falha desconhecida"}`;
-  }
-}
-
-// ── Claude agentic loop ───────────────────────────────────────────────────────
-
-async function askClaude(userText: string): Promise<string> {
-  const messages: Anthropic.MessageParam[] = [
-    {
-      role: "user",
-      content: userText,
-    },
-  ];
-
-  const tools: Anthropic.Tool[] = [
-    {
-      name: "bash",
-      description: `Executa um comando bash no projeto em ${PROJECT_DIR}. Use para ler arquivos, rodar scripts npm, git, etc.`,
-      input_schema: {
-        type: "object",
-        properties: {
-          command: { type: "string", description: "Comando bash a executar" },
-        },
-        required: ["command"],
-      },
-    },
-  ];
-
-  const systemPrompt = `Você é o Agente Setup do projeto whatsapp-business-mcp em ${PROJECT_DIR}.
-Interprete o comando do usuário e execute as ações necessárias usando a ferramenta bash.
-Scripts disponíveis: npm run build | test | dev | connect | agent | typecheck
-Responda sempre em português, de forma concisa e direta.
-Se o comando for ambíguo, execute o que faz mais sentido e explique brevemente o que fez.`;
-
-  let lastText = "";
-  let rounds = 0;
-
-  while (rounds < 8) {
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
-      thinking: { type: "adaptive" },
-      system: systemPrompt,
-      tools,
-      messages,
-    });
-
-    for (const block of resp.content) {
-      if (block.type === "text") lastText = block.text;
-    }
-
-    if (resp.stop_reason === "end_turn") break;
-
-    if (resp.stop_reason === "tool_use") {
-      const toolUses = resp.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      if (toolUses.length === 0) break;
-
-      messages.push({ role: "assistant", content: resp.content });
-
-      const results: Anthropic.ToolResultBlockParam[] = toolUses.map(tu => {
-        const input = tu.input as { command: string };
-        console.error(`[agent] $ ${input.command}`);
-        const output = runBash(input.command);
-        const preview = output.slice(0, 300).replace(/\n/g, " ");
-        console.error(`[agent] → ${preview}`);
-        return {
-          type: "tool_result",
-          tool_use_id: tu.id,
-          content: output.slice(0, 10_000),
-        };
-      });
-
-      messages.push({ role: "user", content: results });
-      rounds++;
-    } else {
-      break;
-    }
-  }
-
-  return lastText || "Concluído.";
-}
 
 // ── Message handler ───────────────────────────────────────────────────────────
 
@@ -175,7 +75,7 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
   } catch { /* best-effort */ }
 
   try {
-    const answer = await askClaude(command);
+    const answer = await interpretCommand(command, { model: MODEL });
     const truncated = answer.length > MAX_REPLY_LEN
       ? answer.slice(0, MAX_REPLY_LEN) + "\n\n…(truncado)"
       : answer;
