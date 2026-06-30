@@ -6,15 +6,23 @@ zone              = "us-central1-a"
 domain            = "baita.ac"
 iap_support_email = "renato@baita.ac"
 
-# Hostnames: deixe vazios para derivar do IP fixo via nip.io (sem precisar de
-# acesso ao DNS do baita.ac, que está no Cloudflare). O login continua restrito
-# a @baita.ac pelo IAP, independentemente do nome da URL.
+# ── Hostnames ────────────────────────────────────────────────────────────────
+# OPÇÃO 1 (padrão): nip.io derivado do IP fixo — sem precisar de acesso a DNS.
 app_hostname        = ""
 control_hostname    = ""
 wildcard_dns_suffix = "nip.io"   # ou "sslip.io"
-# Se um dia você controlar um domínio, basta preencher:
-# app_hostname     = "app.exemplo.com"
-# control_hostname = "claude.exemplo.com"
+
+# OPÇÃO 2: domínio próprio baita.one (descomente e ajuste).
+# app_hostname     = "app.baita.one"
+# control_hostname = "claude.baita.one"
+#   2a) DNS no Cloud DNS -> automatiza os registros A:
+# manage_dns       = true
+# dns_managed_zone = "baita-one"          # nome da managed zone
+#   2b) DNS em outro registrador -> deixe manage_dns=false e crie 2 registros A
+#       (app./claude.baita.one) apontando para o output load_balancer_ip.
+
+# O login continua restrito a @baita.ac pelo IAP, independentemente do domínio
+# da URL. Para logar com @baita.one, troque: domain = "baita.one".
 
 machine_type          = "e2-standard-4"
 disk_size_gb          = 80

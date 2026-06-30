@@ -42,6 +42,18 @@ variable "wildcard_dns_suffix" {
   default     = "nip.io"
 }
 
+variable "manage_dns" {
+  type        = bool
+  description = "Se true, cria os registros A no Cloud DNS automaticamente (requer o domínio — ex.: baita.one — servido por uma managed zone do Cloud DNS)."
+  default     = false
+}
+
+variable "dns_managed_zone" {
+  type        = string
+  description = "Nome da managed zone do Cloud DNS que serve o domínio (ex.: 'baita-one'). Usado só quando manage_dns = true."
+  default     = ""
+}
+
 variable "machine_type" {
   type    = string
   default = "e2-standard-4"

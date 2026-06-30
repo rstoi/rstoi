@@ -60,19 +60,34 @@ make control      # build + push da imagem real e aponta o Cloud Run pra ela
 make secret       # cola a sk-ant-... (vai para o Secret Manager)
 ```
 
-## Passo 4 — DNS (automático via nip.io)
+## Passo 4 — DNS
 
-**Nenhum passo manual.** Como o DNS do `baita.ac` está no Cloudflare (sem acesso),
-os hostnames são derivados do IP fixo via `nip.io`: `app.<ip>.nip.io` e
-`claude.<ip>.nip.io` já resolvem para o LB sozinhos.
+O login é sempre restrito a `@baita.ac` pelo **IAP** (identidade Google) —
+independe do nome da URL. Escolha como nomear o endereço:
+
+**A) nip.io (padrão, zero passo manual).** Hostnames derivados do IP fixo
+(`app.<ip>.nip.io` / `claude.<ip>.nip.io`), resolvem sozinhos. Bom para o
+`baita.ac`, cujo DNS está no Cloudflare sem acesso.
 
 ```bash
-make dns          # mostra o IP do LB e as URLs nip.io geradas
+make dns          # mostra o IP do LB e as URLs geradas
 ```
 
-> O login continua restrito a `@baita.ac` pelo **IAP** — a trava é a identidade
-> Google, não o nome da URL. Se um dia você obtiver acesso a um domínio, basta
-> preencher `app_hostname`/`control_hostname` no tfvars e `make apply`.
+**B) Domínio próprio `baita.one`, DNS no Cloud DNS (automático).** No tfvars:
+`app_hostname="app.baita.one"`, `control_hostname="claude.baita.one"`,
+`manage_dns=true`, `dns_managed_zone="baita-one"`. O Terraform cria os registros
+A. (Crie a managed zone e delegue os NS no registrador do baita.one uma vez —
+veja `infra/terraform/dns.tf`.)
+
+**C) Domínio próprio `baita.one`, DNS em outro registrador (manual).** No tfvars
+defina os hostnames e deixe `manage_dns=false`; depois crie 2 registros A:
+
+```
+A app.baita.one    -> <load_balancer_ip>
+A claude.baita.one -> <load_balancer_ip>
+```
+
+> Para logar com `@baita.one` (se for Workspace), troque `domain="baita.one"` no tfvars.
 
 ## Passo 5 — Aguardar e validar
 
