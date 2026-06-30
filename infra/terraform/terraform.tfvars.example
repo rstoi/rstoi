@@ -1,0 +1,16 @@
+# Copie para terraform.tfvars e ajuste.
+project_id        = "meu-projeto-gcp"
+region            = "us-central1"
+zone              = "us-central1-a"
+
+domain            = "baita.ac"
+app_hostname      = "app.baita.ac"
+control_hostname  = "claude.baita.ac"
+iap_support_email = "renato@baita.ac"
+
+machine_type          = "e2-standard-4"
+disk_size_gb          = 80
+idle_shutdown_minutes = 30
+
+# Opcional: deixe vazio e popule o Secret Manager manualmente (recomendado).
+# anthropic_api_key = "sk-ant-..."
