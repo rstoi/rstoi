@@ -6,6 +6,9 @@
 > **Emanuel.ia** e operada por um squad de agentes de IA. Este é o documento que o squad lê
 > primeiro. Fontes: [`estrategia-reposicionamento.md`](estrategia-reposicionamento.md)
 > (estratégia de mercado) e [`historia.md`](historia.md) (origem e DNA).
+>
+> **Para colocar em prática, dia a dia, use o [`operacao.md`](operacao.md)** — o manual de
+> operação (loop do CEO, cadência, sprint de 30 dias, SOPs e templates).
 
 ---
 

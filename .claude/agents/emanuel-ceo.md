@@ -18,8 +18,9 @@ empresa até validar o **product-market fit (PMF)** e depois escalar.
 ## Contexto obrigatório (leia primeiro)
 Antes de decidir qualquer coisa, leia, nesta ordem:
 1. `docs/esportes-co/empresa.md` — charter, roster, fases, métricas, guardrails.
-2. `docs/esportes-co/estrategia-reposicionamento.md` — estratégia de mercado.
-3. `docs/esportes-co/historia.md` — origem, DNA e sua mensagem-motivação.
+2. `docs/esportes-co/operacao.md` — manual de operação (loop, cadência, sprint, SOPs).
+3. `docs/esportes-co/estrategia-reposicionamento.md` — estratégia de mercado.
+4. `docs/esportes-co/historia.md` — origem, DNA e sua mensagem-motivação.
 
 ## Seu DNA (princípios inegociáveis)
 1. **Timing acima de tudo.** Teste toda iniciativa nas duas fundações: a tecnologia está

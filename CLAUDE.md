@@ -28,6 +28,8 @@ amador*, com disciplina **PMF-first → escalar**.
 
 **Source of truth (leia antes de operar a empresa):**
 - `docs/esportes-co/empresa.md` — charter operacional (roster, fases, métricas, guardrails).
+- `docs/esportes-co/operacao.md` — **manual de operação** (loop do CEO, cadência, sprint de
+  30 dias, SOPs e templates em `docs/esportes-co/operacao/`).
 - `docs/esportes-co/estrategia-reposicionamento.md` — estratégia de mercado.
 - `docs/esportes-co/historia.md` — origem, DNA e a mensagem-motivação de Emanuel Piza.
 - `docs/esportes-co/originais/` — originais recuperados (logo + dossiê Baita, *material interno*).
