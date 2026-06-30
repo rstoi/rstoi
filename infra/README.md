@@ -6,8 +6,8 @@ A VM **se desliga sozinha quando ociosa** e **acorda sob demanda** ao acessar.
 
 ```
 device ─HTTPS─▶ Load Balancer + IAP (consent Internal + domain:baita.ac)
-                 ├── claude.<ip>.nip.io ─▶ Cloud Run "control" (sempre on: status + acordar)
-                 └── app.<ip>.nip.io    ─▶ VM code-server:8080 (editor + terminal + noVNC)
+                 ├── claude.baita.one ─▶ Cloud Run "control" (sempre on: status + acordar)
+                 └── app.baita.one    ─▶ VM code-server:8080 (editor + terminal + noVNC)
                                           ├─ Xvfb :99 + fluxbox + Chromium/Playwright
                                           ├─ computer-use MCP, github, whatsapp…
                                           ├─ tmux "claude"  (sessão sempre viva)
@@ -38,28 +38,27 @@ terraform apply          # cria tudo (control roda imagem placeholder)
 # publica a imagem real do serviço de controle:
 GCP_PROJECT=<proj> GCP_REGION=us-central1 bash ../scripts/deploy-control.sh
 
-# DNS: nada a fazer. Os hostnames são derivados do IP fixo via nip.io
-# (app.<ip>.nip.io / claude.<ip>.nip.io) e resolvem sozinhos. Veja as URLs:
-terraform output control_url
+# DNS no Porkbun (baita.one) via API — cria app.baita.one e claude.baita.one:
+export PORKBUN_API_KEY=pk1_... PORKBUN_SECRET_API_KEY=sk1_...
+make porkbun
 
 # popule a chave da Anthropic (se não passou via tfvars):
 echo -n "sk-ant-..." | gcloud secrets versions add anthropic-api-key --data-file=-
 ```
 
-Aguarde o certificado gerenciado ficar `ACTIVE` (até ~20 min).
-Acesse a **`control_url`** (`https://claude.<ip>.nip.io`), logue com a conta
-`@baita.ac` → botão **Acordar** → redirecionado ao editor.
+Aguarde o certificado gerenciado ficar `ACTIVE` (até ~20 min após a propagação).
+Acesse **https://claude.baita.one**, logue com a conta `@baita.ac` → botão
+**Acordar** → redirecionado ao editor.
 
-> O DNS do `baita.ac` está no Cloudflare (sem acesso), então usamos `nip.io`:
-> o hostname codifica o IP fixo e resolve sem nenhum registro manual. A trava de
-> login em `@baita.ac` é do **IAP** (identidade Google) — independe da URL. Se
-> obtiver um domínio próprio, preencha `app_hostname`/`control_hostname` no tfvars.
+> A trava de login em `@baita.ac` é do **IAP** (identidade Google) — independe da
+> URL. `baita.one` é só o endereço. Sem domínio, dá pra usar `nip.io` (hostnames
+> vazios no tfvars); com Cloud DNS, `manage_dns=true`.
 
 ## Acesso
 
-- **`control_url`** (`https://claude.<ip>.nip.io`) — bookmark principal. Mostra o
-  estado, acorda a VM, redireciona. Dá pra "instalar" como app (PWA).
-- **`app_url`** (`https://app.<ip>.nip.io`) — editor (code-server) + terminal.
+- **https://claude.baita.one** — bookmark principal. Mostra o estado, acorda a VM,
+  redireciona. Dá pra "instalar" como app (PWA).
+- **https://app.baita.one** — editor (code-server) + terminal integrado com o Claude.
   - `…/proxy/7681/` — só o terminal (`tmux claude`).
   - `…/proxy/6080/vnc.html` — ver o Chromium/computer-use ao vivo.
 - **SSH admin** (sem IP público): `gcloud compute ssh claude-workstation --tunnel-through-iap`.

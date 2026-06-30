@@ -8,12 +8,13 @@
 #   make status      # certificado + estado da VM
 #
 # Variáveis (sobrescreva: make apply PROJECT=meu-proj REGION=us-central1):
-PROJECT ?= $(shell gcloud config get-value project 2>/dev/null)
-REGION  ?= us-central1
-DOMAIN  ?= baita.ac
-TF       = terraform -chdir=terraform
+PROJECT    ?= $(shell gcloud config get-value project 2>/dev/null)
+REGION     ?= us-central1
+DOMAIN     ?= baita.ac     # domínio de LOGIN (Workspace / IAP)
+URL_DOMAIN ?= baita.one    # domínio das URLs (Porkbun)
+TF          = terraform -chdir=terraform
 
-.PHONY: preflight init plan apply control secret dns status destroy
+.PHONY: preflight init plan apply control secret dns porkbun status destroy
 
 preflight:
 	@echo "== ferramentas =="
@@ -53,6 +54,11 @@ dns:
 	@echo "  app:     $$($(TF) output -raw app_url 2>/dev/null)"
 	@echo "  control: $$($(TF) output -raw control_url 2>/dev/null)"
 	@echo; echo "Sem passo de DNS. Login restrito a @$(DOMAIN) pelo IAP."
+
+# Cria/atualiza os registros A no Porkbun (baita.one) via API.
+# Requer PORKBUN_API_KEY e PORKBUN_SECRET_API_KEY no ambiente.
+porkbun:
+	@DOMAIN=$(URL_DOMAIN) bash scripts/porkbun-dns.sh
 
 status:
 	@echo "== certificado gerenciado =="

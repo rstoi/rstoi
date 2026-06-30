@@ -60,34 +60,23 @@ make control      # build + push da imagem real e aponta o Cloud Run pra ela
 make secret       # cola a sk-ant-... (vai para o Secret Manager)
 ```
 
-## Passo 4 — DNS
+## Passo 4 — DNS (baita.one no Porkbun, via API)
 
-O login é sempre restrito a `@baita.ac` pelo **IAP** (identidade Google) —
-independe do nome da URL. Escolha como nomear o endereço:
-
-**A) nip.io (padrão, zero passo manual).** Hostnames derivados do IP fixo
-(`app.<ip>.nip.io` / `claude.<ip>.nip.io`), resolvem sozinhos. Bom para o
-`baita.ac`, cujo DNS está no Cloudflare sem acesso.
+`baita.one` está no Porkbun. Com as chaves da API no ambiente, os registros A
+são criados automaticamente apontando para o IP fixo do LB.
 
 ```bash
-make dns          # mostra o IP do LB e as URLs geradas
+export PORKBUN_API_KEY=pk1_...
+export PORKBUN_SECRET_API_KEY=sk1_...
+make porkbun       # cria/atualiza app.baita.one e claude.baita.one -> IP do LB
 ```
 
-**B) Domínio próprio `baita.one`, DNS no Cloud DNS (automático).** No tfvars:
-`app_hostname="app.baita.one"`, `control_hostname="claude.baita.one"`,
-`manage_dns=true`, `dns_managed_zone="baita-one"`. O Terraform cria os registros
-A. (Crie a managed zone e delegue os NS no registrador do baita.one uma vez —
-veja `infra/terraform/dns.tf`.)
-
-**C) Domínio próprio `baita.one`, DNS em outro registrador (manual).** No tfvars
-defina os hostnames e deixe `manage_dns=false`; depois crie 2 registros A:
-
-```
-A app.baita.one    -> <load_balancer_ip>
-A claude.baita.one -> <load_balancer_ip>
-```
-
-> Para logar com `@baita.one` (se for Workspace), troque `domain="baita.one"` no tfvars.
+> Login segue restrito a `@baita.ac` pelo **IAP** (identidade Google) — independe
+> da URL. Para logar com `@baita.one` (se for Workspace), troque `domain="baita.one"`
+> no tfvars.
+>
+> Alternativas (sem Porkbun): `nip.io` derivado do IP (hostnames vazios no tfvars),
+> ou Cloud DNS (`manage_dns=true`). Veja `terraform.tfvars.example`.
 
 ## Passo 5 — Aguardar e validar
 

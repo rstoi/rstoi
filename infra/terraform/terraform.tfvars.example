@@ -7,22 +7,23 @@ domain            = "baita.ac"
 iap_support_email = "renato@baita.ac"
 
 # ── Hostnames ────────────────────────────────────────────────────────────────
-# OPÇÃO 1 (padrão): nip.io derivado do IP fixo — sem precisar de acesso a DNS.
-app_hostname        = ""
-control_hostname    = ""
-wildcard_dns_suffix = "nip.io"   # ou "sslip.io"
+# Domínio próprio baita.one (DNS no Porkbun, via API).
+app_hostname     = "app.baita.one"
+control_hostname = "claude.baita.one"
+manage_dns       = false   # DNS é feito pelo Porkbun (make porkbun), não pelo Cloud DNS
 
-# OPÇÃO 2: domínio próprio baita.one (descomente e ajuste).
-# app_hostname     = "app.baita.one"
-# control_hostname = "claude.baita.one"
-#   2a) DNS no Cloud DNS -> automatiza os registros A:
-# manage_dns       = true
-# dns_managed_zone = "baita-one"          # nome da managed zone
-#   2b) DNS em outro registrador -> deixe manage_dns=false e crie 2 registros A
-#       (app./claude.baita.one) apontando para o output load_balancer_ip.
+# Os registros A são criados por infra/scripts/porkbun-dns.sh com as chaves:
+#   export PORKBUN_API_KEY=pk1_...
+#   export PORKBUN_SECRET_API_KEY=sk1_...
+# e então:  make porkbun   (depois do apply)
 
-# O login continua restrito a @baita.ac pelo IAP, independentemente do domínio
-# da URL. Para logar com @baita.one, troque: domain = "baita.one".
+# ALTERNATIVA sem domínio: deixe os hostnames vazios para usar nip.io.
+# app_hostname = ""
+# control_hostname = ""
+# wildcard_dns_suffix = "nip.io"
+
+# Login restrito a @baita.ac pelo IAP, independente da URL.
+# Para logar com @baita.one, troque: domain = "baita.one".
 
 machine_type          = "e2-standard-4"
 disk_size_gb          = 80
