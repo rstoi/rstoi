@@ -27,6 +27,7 @@ python3 -m pip install --quiet --disable-pip-version-check -r requirements.txt
 
 echo "[session-start] Diretório de dados (sessões/SQLite dos agentes)…"
 mkdir -p data
+mkdir -p data/x-session   # sessão do navegador do agente X (login via npm run x-connect)
 
 # Chromium para o adaptador Playwright/WhatsApp e computer-use.
 # Best-effort: não derruba a sessão se o CDN do Playwright estiver bloqueado —

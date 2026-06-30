@@ -1,25 +1,37 @@
 #!/usr/bin/env tsx
 /**
- * WhatsApp Setup Agent
+ * Agente WhatsApp — comandos /setup e /x
  *
- * Monitora mensagens WhatsApp para comandos /setup e os interpreta
- * e executa via Claude API (claude-opus-4-8) com ferramenta bash.
+ * Um único processo conecta ao WhatsApp Web (Playwright) e escuta dois comandos:
+ *   /setup <pedido> — interpreta e executa ações no projeto via Claude + bash.
+ *   /x <ideia>      — opera postagens no X (Twitter) em nome do @rtoi: rascunha
+ *                     com Claude e (por padrão) pede aprovação antes de publicar.
+ *
+ * IMPORTANTE: a sessão do WhatsApp Web é single-active — NÃO rode um segundo
+ * processo apontando para o mesmo WA_SESSION_DIR (eles se deslogam). O X usa um
+ * Chromium/contexto SEPARADO (X_SESSION_DIR), iniciado sob demanda no 1º /x.
  *
  * Pré-requisitos:
  *   - ANTHROPIC_API_KEY configurada
- *   - Chrome/Chromium instalado (npm run setup:chrome)
  *   - Sessão WhatsApp ativa (npm run connect)
+ *   - Para /x: sessão do X ativa (npm run x-connect)
  *
  * Uso: npm run agent
- * Ou:  ANTHROPIC_API_KEY=sk-ant-... WA_ADAPTER=playwright tsx scripts/wa-agent.ts
  */
 
 import Anthropic from "@anthropic-ai/sdk";
 import { execSync } from "child_process";
 import { PlaywrightClient } from "../src/adapters/playwright/client.js";
+import { XClient } from "../src/adapters/x/client.js";
 import { guardAdapter } from "../src/guard.js";
 import { parseCsv, isAuthorized } from "../src/agent-auth.js";
 import { closeDb } from "../src/store/db.js";
+import { draftPost, type DraftKind } from "../src/x-draft.js";
+import {
+  parseXCommand, classifyReply, shouldAutoPost, parseAutoPostMode, isExpired,
+  isDraftingCommand, putPendingDraft, getPendingDraft, clearPendingDraft,
+  initXSchema, type PendingDraft, type XCommand,
+} from "../src/x-approval.js";
 import type { WhatsAppAdapter } from "../src/adapters/base.js";
 import type { Message } from "../src/types/index.js";
 
@@ -31,6 +43,12 @@ const MAX_REPLY_LEN = 3800;
 // Controles de segurança do /setup (RCE) — ver src/agent-auth.ts.
 const AGENT_GROUPS = parseCsv(process.env.WA_AGENT_GROUPS);          // grupos onde responde
 const ALLOWED_SENDERS = parseCsv(process.env.WA_AGENT_ALLOWED_SENDERS); // quem pode disparar
+
+// Autorização do /x (allowlist própria, mais restrita — posta como @rtoi).
+const X_AGENT_GROUPS = parseCsv(process.env.X_AGENT_GROUPS);
+const X_ALLOWED_SENDERS = parseCsv(process.env.X_AGENT_ALLOWED_SENDERS);
+const X_AUTO_POST = parseAutoPostMode(process.env.X_AUTO_POST);
+const X_APPROVAL_TIMEOUT_MS = parseInt(process.env.X_APPROVAL_TIMEOUT_MS ?? "1800000", 10);
 
 const HELP_TEXT = [
   "🛠️ *Agente Setup — comandos aceitos no WhatsApp*",
@@ -48,9 +66,28 @@ const HELP_TEXT = [
   "ℹ️ Funciona apenas nos grupos autorizados e para membros deles.",
 ].join("\n");
 
+const X_HELP_TEXT = [
+  "🐦 *Agente X (@rtoi) — comandos*",
+  "",
+  "Use: */x <ideia>* — eu rascunho o post e peço sua aprovação antes de publicar.",
+  "",
+  "*Comandos:*",
+  "• */x <ideia>* → tweet (ou thread, se render)",
+  "• */x thread <ideia>* → força uma thread",
+  "• */x responder <url> <ideia>* → responde um tweet",
+  "• */x citar <url> <ideia>* → quote-post",
+  "• */x curtir <url>* → curte",
+  "• */x repostar <url>* → reposta (RT)",
+  "• */x mentions* → lê suas menções recentes",
+  "• */x ajuda* → mostra esta ajuda",
+  "",
+  "Ao receber um rascunho, responda: *ok* p/ publicar, *editar <texto>* p/ ajustar, *cancelar* p/ descartar.",
+  "ℹ️ Restrito aos grupos/remetentes autorizados do /x.",
+].join("\n");
+
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Tool execution ────────────────────────────────────────────────────────────
+// ── Tool execution (/setup) ─────────────────────────────────────────────────
 
 function runBash(command: string): string {
   try {
@@ -68,7 +105,7 @@ function runBash(command: string): string {
   }
 }
 
-// ── Claude agentic loop ───────────────────────────────────────────────────────
+// ── Claude agentic loop (/setup) ────────────────────────────────────────────
 
 async function askClaude(userText: string): Promise<string> {
   const messages: Anthropic.MessageParam[] = [
@@ -146,30 +183,34 @@ Se o comando for ambíguo, execute o que faz mais sentido e explique brevemente 
   return lastText || "Concluído.";
 }
 
-// ── Message handler ───────────────────────────────────────────────────────────
+// ── Autorização compartilhada ───────────────────────────────────────────────
 
-async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
-  // Autorização (deny por padrão): aceita /setup de membros de um grupo
-  // escopado (WA_AGENT_GROUPS) ou de um remetente explicitamente autorizado.
-  let groupName = "";
+async function resolveGroupName(adapter: WhatsAppAdapter, msg: Message): Promise<string> {
   if (msg.isGroup && typeof msg.chatId === "string" && msg.chatId.endsWith("@g.us")) {
-    try { groupName = (await adapter.getGroup(msg.chatId))?.name ?? ""; } catch { /* best-effort */ }
+    try { return (await adapter.getGroup(msg.chatId))?.name ?? ""; } catch { /* best-effort */ }
   }
+  return "";
+}
+
+// ── /setup handler ──────────────────────────────────────────────────────────
+
+async function handleSetupCommand(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
+  // Autorização (deny por padrão): membros de um grupo escopado (WA_AGENT_GROUPS)
+  // ou remetente explicitamente autorizado.
+  const groupName = await resolveGroupName(adapter, msg);
   if (!isAuthorized({ chatId: msg.chatId, groupName, fromId: msg.fromId, groups: AGENT_GROUPS, senders: ALLOWED_SENDERS })) {
-    console.error(`[agent] negado (fora do escopo/não autorizado): ${groupName || msg.chatId} / ${msg.fromId}`);
+    console.error(`[agent] /setup negado: ${groupName || msg.chatId} / ${msg.fromId}`);
     return; // silencioso
   }
 
   const command = msg.text!.slice(CMD_PREFIX.length).trim() || "status do projeto";
   console.error(`[agent] /setup de ${msg.fromId} (${groupName || msg.chatId}): ${command}`);
 
-  // Ajuda: lista os comandos aceitos sem executar nada.
   if (/^(ajuda|help|\?|comandos)$/i.test(command)) {
     await adapter.sendMessage(msg.chatId, { text: HELP_TEXT }).catch(() => {});
     return;
   }
 
-  // Acknowledge
   try {
     await adapter.sendMessage(msg.chatId, { text: `⏳ Executando: _${command}_` });
   } catch { /* best-effort */ }
@@ -182,12 +223,244 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
     await adapter.sendMessage(msg.chatId, { text: `✅ ${truncated}` });
   } catch (err: unknown) {
     const msg2 = err instanceof Error ? err.message : String(err);
-    console.error("[agent] Erro ao processar:", msg2);
+    console.error("[agent] Erro ao processar /setup:", msg2);
     try {
-      await adapter.sendMessage(msg.chatId, {
-        text: `❌ Erro: ${msg2.slice(0, 200)}`,
-      });
+      await adapter.sendMessage(msg.chatId, { text: `❌ Erro: ${msg2.slice(0, 200)}` });
     } catch { /* give up */ }
+  }
+}
+
+// ── /x handler (agente de postagens no X) ───────────────────────────────────
+
+let xClient: XClient | null = null;
+
+async function getXClient(): Promise<XClient> {
+  if (!xClient) xClient = new XClient();
+  if (!xClient.isConnected()) await xClient.connect();
+  return xClient;
+}
+
+function previewDraft(draft: PendingDraft): string {
+  const head = draft.kind === "thread"
+    ? `🧵 *Rascunho de thread (${draft.tweets.length} tweets)*`
+    : draft.kind === "reply" ? "↩️ *Rascunho de resposta*"
+    : draft.kind === "quote" ? "🔁 *Rascunho de quote*"
+    : "🐦 *Rascunho de tweet*";
+  const body = draft.tweets.map((t, i) =>
+    draft.tweets.length > 1 ? `*${i + 1}.* ${t}` : t).join("\n\n");
+  const target = draft.targetUrl ? `\n_alvo:_ ${draft.targetUrl}` : "";
+  return `${head}${target}\n\n${body}\n\n— Responda *ok* p/ publicar, *editar <texto>* ou *cancelar*.`;
+}
+
+/** Publica um rascunho no X conforme o tipo. Retorna a URL resultante. */
+async function publishDraft(x: XClient, draft: PendingDraft): Promise<string> {
+  if (draft.kind === "reply" && draft.targetUrl) {
+    let prev = draft.targetUrl;
+    let firstUrl = "";
+    for (const t of draft.tweets) {
+      const r = await x.reply(prev, t);
+      if (!firstUrl) firstUrl = r.url;
+      prev = r.url || prev;
+    }
+    return firstUrl;
+  }
+  if (draft.kind === "quote" && draft.targetUrl) {
+    const r = await x.quote(draft.targetUrl, draft.tweets[0]);
+    return r.url;
+  }
+  // tweet ou thread
+  const r = await x.postThread(draft.tweets);
+  return r.url;
+}
+
+async function publishAndConfirm(adapter: WhatsAppAdapter, chatId: string, draft: PendingDraft): Promise<void> {
+  const x = await getXClient();
+  const url = await publishDraft(x, draft);
+  const dry = x.isDryRun() ? " _(DRY-RUN — não publicado de verdade)_" : "";
+  await adapter.sendMessage(chatId, { text: `✅ Publicado no X${dry}${url ? `\n${url}` : ""}` }).catch(() => {});
+}
+
+const KIND_BY_COMMAND: Record<string, DraftKind> = {
+  post: "tweet", thread: "thread", reply: "reply", quote: "quote",
+};
+
+async function handleXCommand(adapter: WhatsAppAdapter, msg: Message, cmd: XCommand): Promise<void> {
+  const chatId = msg.chatId;
+
+  // Ajuda não exige conexão ao X.
+  if (cmd.type === "help") {
+    await adapter.sendMessage(chatId, { text: X_HELP_TEXT }).catch(() => {});
+    return;
+  }
+
+  // Ações sem rascunho: curtir, repostar, ler menções.
+  if (cmd.type === "like" || cmd.type === "repost") {
+    if (!cmd.targetUrl) {
+      await adapter.sendMessage(chatId, { text: "⚠️ Informe a URL do tweet. Ex.: /x curtir https://x.com/.../status/123" }).catch(() => {});
+      return;
+    }
+    try {
+      const x = await getXClient();
+      if (cmd.type === "like") await x.like(cmd.targetUrl);
+      else await x.repost(cmd.targetUrl);
+      const dry = x.isDryRun() ? " _(DRY-RUN)_" : "";
+      await adapter.sendMessage(chatId, { text: `✅ ${cmd.type === "like" ? "Curtido" : "Repostado"}${dry}: ${cmd.targetUrl}` }).catch(() => {});
+    } catch (err) {
+      await notifyXError(adapter, chatId, err);
+    }
+    return;
+  }
+
+  if (cmd.type === "mentions") {
+    try {
+      const x = await getXClient();
+      const mentions = await x.getMentions(10);
+      const body = mentions.length
+        ? mentions.map((m, i) => `*${i + 1}.* ${m.author}: ${m.text.slice(0, 120)}\n${m.url}`).join("\n\n")
+        : "Nenhuma menção recente encontrada.";
+      await adapter.sendMessage(chatId, { text: `📨 *Menções recentes*\n\n${body}` }).catch(() => {});
+    } catch (err) {
+      await notifyXError(adapter, chatId, err);
+    }
+    return;
+  }
+
+  // Comandos que geram rascunho: post / thread / reply / quote.
+  if (!isDraftingCommand(cmd.type)) return;
+  if ((cmd.type === "reply" || cmd.type === "quote") && !cmd.targetUrl) {
+    await adapter.sendMessage(chatId, { text: "⚠️ Informe a URL do tweet alvo." }).catch(() => {});
+    return;
+  }
+  if (!cmd.idea.trim()) {
+    await adapter.sendMessage(chatId, { text: "⚠️ Diga o que postar. Ex.: /x lançamos o novo agente hoje 🚀" }).catch(() => {});
+    return;
+  }
+
+  await adapter.sendMessage(chatId, { text: "✍️ Rascunhando…" }).catch(() => {});
+
+  try {
+    const draftKind = cmd.type === "post" ? "auto" : KIND_BY_COMMAND[cmd.type];
+    const result = await draftPost(cmd.idea, { kind: draftKind });
+    const now = Date.now();
+    const draft: PendingDraft = {
+      chatId,
+      requestedBy: msg.fromId,
+      idea: cmd.idea,
+      tweets: result.tweets,
+      kind: cmd.type === "post" ? result.kind : KIND_BY_COMMAND[cmd.type],
+      targetUrl: cmd.targetUrl,
+      createdAt: now,
+      expiresAt: now + X_APPROVAL_TIMEOUT_MS,
+      status: "awaiting_approval",
+    };
+
+    if (shouldAutoPost(draft.kind, X_AUTO_POST)) {
+      await publishAndConfirm(adapter, chatId, draft);
+    } else {
+      putPendingDraft(draft);
+      await adapter.sendMessage(chatId, { text: previewDraft(draft) }).catch(() => {});
+    }
+  } catch (err) {
+    await notifyXError(adapter, chatId, err);
+  }
+}
+
+/** Trata uma resposta (sem prefixo) quando há rascunho pendente para o chat. */
+async function handleApprovalReply(adapter: WhatsAppAdapter, msg: Message, draft: PendingDraft): Promise<void> {
+  const chatId = msg.chatId;
+
+  if (isExpired(draft)) {
+    clearPendingDraft(chatId);
+    await adapter.sendMessage(chatId, { text: "⌛ O rascunho expirou. Mande */x <ideia>* de novo." }).catch(() => {});
+    return;
+  }
+
+  const { action, editText } = classifyReply(msg.text ?? "");
+
+  if (action === "cancel") {
+    clearPendingDraft(chatId);
+    await adapter.sendMessage(chatId, { text: "🗑️ Rascunho descartado." }).catch(() => {});
+    return;
+  }
+
+  if (action === "publish") {
+    try {
+      await publishAndConfirm(adapter, chatId, draft);
+      clearPendingDraft(chatId);
+    } catch (err) {
+      await notifyXError(adapter, chatId, err);
+    }
+    return;
+  }
+
+  if (action === "edit") {
+    await adapter.sendMessage(chatId, { text: "✍️ Ajustando…" }).catch(() => {});
+    try {
+      const guidance = editText
+        ? `${draft.idea}\n\nAjuste pedido: ${editText}`
+        : draft.idea;
+      const result = await draftPost(guidance, { kind: draft.kind === "tweet" ? "auto" : draft.kind });
+      const updated: PendingDraft = {
+        ...draft,
+        tweets: result.tweets,
+        kind: draft.kind === "reply" || draft.kind === "quote" ? draft.kind : result.kind,
+        status: "awaiting_approval",
+      };
+      putPendingDraft(updated);
+      await adapter.sendMessage(chatId, { text: previewDraft(updated) }).catch(() => {});
+    } catch (err) {
+      await notifyXError(adapter, chatId, err);
+    }
+    return;
+  }
+
+  // action === "none": lembra as opções.
+  await adapter.sendMessage(chatId, {
+    text: "❓ Há um rascunho pendente. Responda *ok*, *editar <texto>* ou *cancelar*.",
+  }).catch(() => {});
+}
+
+async function notifyXError(adapter: WhatsAppAdapter, chatId: string, err: unknown): Promise<void> {
+  const m = err instanceof Error ? err.message : String(err);
+  console.error("[agent] Erro no /x:", m);
+  await adapter.sendMessage(chatId, { text: `❌ Erro no X: ${m.slice(0, 240)}` }).catch(() => {});
+}
+
+// ── Roteamento de mensagens ─────────────────────────────────────────────────
+
+function startsWithX(text: string): boolean {
+  return /^\/x(\s|$)/i.test(text);
+}
+
+async function routeMessage(adapter: WhatsAppAdapter, msg: Message): Promise<void> {
+  const text = msg.text ?? "";
+
+  // /setup → handler existente.
+  if (text.startsWith(CMD_PREFIX)) {
+    await handleSetupCommand(adapter, msg);
+    return;
+  }
+
+  // /x → handler do X (autorização própria).
+  if (startsWithX(text)) {
+    const groupName = await resolveGroupName(adapter, msg);
+    if (!isAuthorized({ chatId: msg.chatId, groupName, fromId: msg.fromId, groups: X_AGENT_GROUPS, senders: X_ALLOWED_SENDERS })) {
+      console.error(`[agent] /x negado: ${groupName || msg.chatId} / ${msg.fromId}`);
+      return; // silencioso
+    }
+    const body = text.replace(/^\/x\s*/i, "");
+    await handleXCommand(adapter, msg, parseXCommand(body));
+    return;
+  }
+
+  // Resposta a um rascunho pendente (sem prefixo).
+  const draft = getPendingDraft(msg.chatId);
+  if (draft) {
+    const groupName = await resolveGroupName(adapter, msg);
+    if (!isAuthorized({ chatId: msg.chatId, groupName, fromId: msg.fromId, groups: X_AGENT_GROUPS, senders: X_ALLOWED_SENDERS })) {
+      return; // só autorizados aprovam
+    }
+    await handleApprovalReply(adapter, msg, draft);
   }
 }
 
@@ -195,8 +468,7 @@ async function handleMessage(adapter: WhatsAppAdapter, msg: Message): Promise<vo
 
 async function main() {
   console.error("\n╔══════════════════════════════════════════════════╗");
-  console.error(  "║  WhatsApp Setup Agent                             ║");
-  console.error(  "║  Aguardando comandos /setup no WhatsApp...        ║");
+  console.error(  "║  Agente WhatsApp — comandos /setup e /x           ║");
   console.error(  "╚══════════════════════════════════════════════════╝\n");
 
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -204,20 +476,21 @@ async function main() {
     process.exit(1);
   }
 
+  // Prepara as tabelas do agente X (idempotente).
+  try { initXSchema(); } catch (e) { console.error("[agent] aviso: initXSchema falhou:", e); }
+
   // Envolve o cliente no guard: o agente NÃO processa nem responde mensagens de
-  // grupos bloqueados (WA_BLOCKED_GROUPS, ex.: financasfacil). O onMessage
-  // recebido já vem filtrado e o sendMessage de resposta também é barrado.
+  // grupos bloqueados (WA_BLOCKED_GROUPS, ex.: financasfacil).
   const adapter = guardAdapter(new PlaywrightClient());
   const startedAt = Date.now();
 
-  // onMessage is called for every new incoming message scraped from WhatsApp Web
   adapter.onMessage = (msg: Message) => {
     if (msg.timestamp < startedAt) return;          // skip messages before startup
     if (msg.isFromMe) return;                        // ignore own messages
-    if (!msg.text?.startsWith(CMD_PREFIX)) return;  // only /setup commands
+    if (!msg.text) return;
 
-    // Fire-and-forget; errors are caught inside handleMessage
-    handleMessage(adapter, msg).catch(console.error);
+    // Fire-and-forget; erros são tratados dentro dos handlers.
+    routeMessage(adapter, msg).catch(console.error);
   };
 
   console.error("→ Iniciando Chromium e abrindo web.whatsapp.com…\n");
@@ -230,11 +503,13 @@ async function main() {
   }
 
   console.error(`\n✓ Conectado! Monitorando mensagens (modelo: ${MODEL})…`);
-  console.error(`  Envie "/setup <comando>" no WhatsApp para acionar o agente.\n`);
+  console.error(`  /setup <comando>  → ações no projeto`);
+  console.error(`  /x <ideia>        → postagens no X (auto-post: ${JSON.stringify(X_AUTO_POST)})\n`);
 
   process.on("SIGINT", async () => {
     console.error("\n→ Encerrando agente…");
     await adapter.disconnect().catch(() => {});
+    await xClient?.disconnect().catch(() => {});
     closeDb();
     process.exit(0);
   });
