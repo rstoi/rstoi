@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "computer-use": {
+    "desktop": {
       "command": "/home/user/rstoi/node_modules/.bin/tsx",
       "args": ["src/computer-use/server.ts"],
       "cwd": "/home/user/rstoi",

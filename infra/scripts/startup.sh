@@ -152,7 +152,6 @@ ExecStart=/usr/bin/tmux new-session -d -s claude -x 220 -y 50 'claude; exec bash
 ExecStop=/usr/bin/tmux kill-session -t claude
 RemainAfterExit=yes
 Type=oneshot
-Restart=on-failure
 [Install]
 WantedBy=multi-user.target
 EOF

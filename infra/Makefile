@@ -14,7 +14,7 @@ DOMAIN     ?= baita.ac     # domínio de LOGIN (Workspace / IAP)
 URL_DOMAIN ?= baita.one    # domínio das URLs (Porkbun)
 TF          = terraform -chdir=terraform
 
-.PHONY: preflight init plan apply control secret dns porkbun status destroy
+.PHONY: preflight init plan apply control secret dns porkbun status destroy test
 
 preflight:
 	@echo "== ferramentas =="
@@ -73,3 +73,7 @@ status:
 
 destroy:
 	@$(TF) destroy
+
+# Bateria de testes local (sem GCP). Ver infra/test/README.md.
+test:
+	@bash test/run-all.sh

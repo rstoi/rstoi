@@ -80,6 +80,13 @@ típico. Sempre ligada seria ~US$ 110–130/mês. Ajuste `idle_shutdown_minutes`
 ## MCPs na workstation
 
 A sessão `tmux claude` roda o Claude Code com o `~/.claude` do usuário `claude`.
-Adicione MCPs (computer-use deste repo, github, whatsapp, gmail…) em
-`~/.claude.json`/`.mcp.json` no `workspace`. O `computer-use` já encontra o display
-virtual via `DISPLAY=:99` (idêntico ao `.mcp.json` da raiz deste repo).
+Adicione MCPs (o `desktop`/computer-use deste repo, github, whatsapp, gmail…) em
+`~/.claude.json`/`.mcp.json` no `workspace`. O servidor de computer-use é
+registrado como **`desktop`** — não use o nome `computer-use`, que é **reservado**
+pelo Claude Code e não carrega. Ele já encontra o display virtual via `DISPLAY=:99`
+(idêntico ao `.mcp.json` da raiz deste repo).
+
+## Testes
+
+`make test` (ou `bash test/run-all.sh`) valida localmente, sem GCP, todos os
+caminhos de acesso e o Claude operando dentro deles. Ver `test/README.md`.

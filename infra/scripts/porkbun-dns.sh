@@ -17,7 +17,7 @@ set -euo pipefail
 DOMAIN="${DOMAIN:-baita.one}"
 SUBS="${SUBS:-app claude}"
 TTL="${TTL:-300}"
-API="https://api.porkbun.com/api/json/v3"
+API="${PORKBUN_API:-https://api.porkbun.com/api/json/v3}"
 TF_DIR="$(cd "$(dirname "$0")/../terraform" && pwd)"
 
 : "${PORKBUN_API_KEY:?defina PORKBUN_API_KEY no ambiente}"
