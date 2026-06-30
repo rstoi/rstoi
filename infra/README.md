@@ -6,8 +6,8 @@ A VM **se desliga sozinha quando ociosa** e **acorda sob demanda** ao acessar.
 
 ```
 device ─HTTPS─▶ Load Balancer + IAP (consent Internal + domain:baita.ac)
-                 ├── claude.baita.ac ─▶ Cloud Run "control"  (sempre on: status + acordar)
-                 └── app.baita.ac    ─▶ VM code-server:8080  (editor + terminal + noVNC)
+                 ├── claude.<ip>.nip.io ─▶ Cloud Run "control" (sempre on: status + acordar)
+                 └── app.<ip>.nip.io    ─▶ VM code-server:8080 (editor + terminal + noVNC)
                                           ├─ Xvfb :99 + fluxbox + Chromium/Playwright
                                           ├─ computer-use MCP, github, whatsapp…
                                           ├─ tmux "claude"  (sessão sempre viva)
@@ -38,23 +38,28 @@ terraform apply          # cria tudo (control roda imagem placeholder)
 # publica a imagem real do serviço de controle:
 GCP_PROJECT=<proj> GCP_REGION=us-central1 bash ../scripts/deploy-control.sh
 
-# DNS: aponte os dois hostnames para o IP do LB (output load_balancer_ip)
-#   A app.baita.ac     -> <IP>
-#   A claude.baita.ac  -> <IP>
+# DNS: nada a fazer. Os hostnames são derivados do IP fixo via nip.io
+# (app.<ip>.nip.io / claude.<ip>.nip.io) e resolvem sozinhos. Veja as URLs:
+terraform output control_url
 
 # popule a chave da Anthropic (se não passou via tfvars):
 echo -n "sk-ant-..." | gcloud secrets versions add anthropic-api-key --data-file=-
 ```
 
-Aguarde o certificado gerenciado ficar `ACTIVE` (até ~20 min após o DNS propagar).
-Acesse **https://claude.baita.ac**, logue com a conta `@baita.ac` → botão **Acordar**
-→ redirecionado ao editor.
+Aguarde o certificado gerenciado ficar `ACTIVE` (até ~20 min).
+Acesse a **`control_url`** (`https://claude.<ip>.nip.io`), logue com a conta
+`@baita.ac` → botão **Acordar** → redirecionado ao editor.
+
+> O DNS do `baita.ac` está no Cloudflare (sem acesso), então usamos `nip.io`:
+> o hostname codifica o IP fixo e resolve sem nenhum registro manual. A trava de
+> login em `@baita.ac` é do **IAP** (identidade Google) — independe da URL. Se
+> obtiver um domínio próprio, preencha `app_hostname`/`control_hostname` no tfvars.
 
 ## Acesso
 
-- **https://claude.baita.ac** — bookmark principal. Mostra o estado, acorda a VM,
-  redireciona. Dá pra "instalar" como app (Adicionar à tela inicial → PWA).
-- **https://app.baita.ac** — editor (code-server) + terminal integrado com o Claude.
+- **`control_url`** (`https://claude.<ip>.nip.io`) — bookmark principal. Mostra o
+  estado, acorda a VM, redireciona. Dá pra "instalar" como app (PWA).
+- **`app_url`** (`https://app.<ip>.nip.io`) — editor (code-server) + terminal.
   - `…/proxy/7681/` — só o terminal (`tmux claude`).
   - `…/proxy/6080/vnc.html` — ver o Chromium/computer-use ao vivo.
 - **SSH admin** (sem IP público): `gcloud compute ssh claude-workstation --tunnel-through-iap`.

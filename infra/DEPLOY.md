@@ -60,29 +60,28 @@ make control      # build + push da imagem real e aponta o Cloud Run pra ela
 make secret       # cola a sk-ant-... (vai para o Secret Manager)
 ```
 
-## Passo 4 — 🧑 DNS
+## Passo 4 — DNS (automático via nip.io)
+
+**Nenhum passo manual.** Como o DNS do `baita.ac` está no Cloudflare (sem acesso),
+os hostnames são derivados do IP fixo via `nip.io`: `app.<ip>.nip.io` e
+`claude.<ip>.nip.io` já resolvem para o LB sozinhos.
 
 ```bash
-make dns          # mostra o IP do LB e os nameservers de baita.ac
+make dns          # mostra o IP do LB e as URLs nip.io geradas
 ```
 
-- Se os nameservers forem `*.googledomains.com` → é **Google Cloud DNS**: peça ao
-  Claude para automatizar os registros A no Terraform (ele adiciona um
-  `google_dns_record_set` e re-aplica).
-- Senão → 🧑 crie 2 registros A no seu provedor (Registro.br, Cloudflare, etc.):
-  ```
-  A app.baita.ac    -> <IP do LB>
-  A claude.baita.ac -> <IP do LB>
-  ```
+> O login continua restrito a `@baita.ac` pelo **IAP** — a trava é a identidade
+> Google, não o nome da URL. Se um dia você obtiver acesso a um domínio, basta
+> preencher `app_hostname`/`control_hostname` no tfvars e `make apply`.
 
 ## Passo 5 — Aguardar e validar
 
 ```bash
-make status       # certificado gerenciado deve virar ACTIVE (até ~20 min pós-DNS)
+make status       # certificado gerenciado deve virar ACTIVE (até ~20 min)
 ```
 
 Quando o cert estiver `ACTIVE`:
-1. Abra **https://claude.baita.ac** → login `@baita.ac`.
+1. Abra a **control_url** (`https://claude.<ip>.nip.io`, veja `make dns`) → login `@baita.ac`.
 2. Botão **Acordar** → redireciona ao editor quando a VM sobe (~20–40 s).
 3. Editor + terminal com a sessão do Claude já viva; `…/proxy/6080/vnc.html` para
    ver o Chromium/computer-use ao vivo.
@@ -94,9 +93,9 @@ Quando o cert estiver `ACTIVE`:
 | 🧑 | O quê | Por quê |
 |----|-------|---------|
 | Passo 0 | `gcloud auth login` + billing | identidade e custo são seus |
-| Passo 4 | registros A do DNS | a menos que `baita.ac` esteja no Cloud DNS |
 
-Todo o resto o Claude CLI executa e itera (plan/apply, build, secret, status).
+DNS não é mais checkpoint (nip.io resolve sozinho). Todo o resto o Claude CLI
+executa e itera (plan/apply, build, secret, status).
 
 ## Manutenção
 

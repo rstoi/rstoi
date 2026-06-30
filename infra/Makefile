@@ -45,17 +45,14 @@ secret:
 	printf "%s" "$$KEY" | gcloud secrets versions add anthropic-api-key --data-file=- --project $(PROJECT) \
 		&& echo "chave gravada no Secret Manager."
 
-# Mostra o IP do LB e descobre onde o DNS do domínio é gerenciado (nameservers).
+# Hostnames são derivados do IP fixo via nip.io — nenhum registro manual.
 dns:
 	@echo "== IP do Load Balancer =="
-	@$(TF) output -raw load_balancer_ip 2>/dev/null || echo "(rode 'make apply' antes)"
-	@echo; echo "== nameservers de $(DOMAIN) (onde criar os registros A) =="
-	@dig +short NS $(DOMAIN) 2>/dev/null || nslookup -type=NS $(DOMAIN) 2>/dev/null | grep nameserver || true
-	@echo
-	@echo "Se aparecer *.googledomains.com / ns-cloud-*.googledomains.com => Google Cloud DNS"
-	@echo "(posso automatizar os registros no Terraform). Caso contrário, crie 2 registros A:"
-	@echo "  A app.$(DOMAIN)    -> <IP acima>"
-	@echo "  A claude.$(DOMAIN) -> <IP acima>"
+	@$(TF) output -raw load_balancer_ip 2>/dev/null || { echo "(rode 'make apply' antes)"; exit 0; }
+	@echo; echo "== URLs (nip.io resolve para o IP acima automaticamente) =="
+	@echo "  app:     $$($(TF) output -raw app_url 2>/dev/null)"
+	@echo "  control: $$($(TF) output -raw control_url 2>/dev/null)"
+	@echo; echo "Sem passo de DNS. Login restrito a @$(DOMAIN) pelo IAP."
 
 status:
 	@echo "== certificado gerenciado =="

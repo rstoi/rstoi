@@ -22,7 +22,7 @@ resource "google_compute_global_address" "claude" {
 resource "google_compute_managed_ssl_certificate" "claude" {
   name = "claude-cert"
   managed {
-    domains = [var.app_hostname, var.control_hostname]
+    domains = [local.app_host, local.control_host]
   }
 }
 
@@ -102,11 +102,11 @@ resource "google_compute_url_map" "claude" {
   default_service = google_compute_backend_service.control.id
 
   host_rule {
-    hosts        = [var.app_hostname]
+    hosts        = [local.app_host]
     path_matcher = "app"
   }
   host_rule {
-    hosts        = [var.control_hostname]
+    hosts        = [local.control_host]
     path_matcher = "control"
   }
 

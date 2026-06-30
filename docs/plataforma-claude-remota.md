@@ -37,7 +37,7 @@ A interface chega como app web por três portas, todas atrás do mesmo login:
             ┌────────────▼─────────────┐
             │  Load Balancer + IAP     │  consent Internal + domain:baita.ac
             └─────┬───────────────┬────┘
-   claude.baita.ac│               │app.baita.ac
+ claude.<ip>.nip.io│               │app.<ip>.nip.io
         ┌─────────▼────────┐  ┌───▼──────────────────────────────────┐
         │ Cloud Run control│  │ VM "claude-workstation" (GCE)        │
         │ sempre on        │  │  code-server :8080 (editor+terminal) │
@@ -84,6 +84,10 @@ Como `baita.ac` é Google Workspace e o projeto está na organização:
   fora**. Gestão de acesso = Admin do Workspace (adicionou no Workspace, tem
   acesso; removeu, perdeu — sem tocar na GCP).
 - Zero código de autenticação no app; o IAP injeta a identidade já verificada.
+- **Hostname sem acesso a DNS:** o DNS do `baita.ac` está no Cloudflare (sem
+  acesso), então as URLs são derivadas do IP fixo via `nip.io`
+  (`app.<ip>.nip.io`, `claude.<ip>.nip.io`) — resolvem sozinhas, sem registro
+  manual. A trava em `@baita.ac` é da identidade IAP, **independe da URL**.
 
 ### 3.4 Rede e segredos
 - **Sem IP público de entrada** na VM. Saída (apt, npm, GitHub, API Anthropic)
@@ -95,7 +99,7 @@ Como `baita.ac` é Google Workspace e o projeto está na organização:
 ### 3.5 Custo — auto-stop / auto-start
 - **Auto-stop**: timer systemd checa conexões ativas a cada 5 min; sem ninguém
   por `idle_shutdown_minutes` (padrão 30) → a VM se desliga.
-- **Auto-start**: `claude.baita.ac` (Cloud Run, sempre disponível, escala a zero)
+- **Auto-start**: a control_url (Cloud Run, sempre disponível, escala a zero)
   mostra o estado e tem o botão **Acordar**, que liga a VM e redireciona quando
   ela fica `RUNNING` (~20–40 s).
 - Disco e sessão **persistem** entre stop/start. Estimativa: **~US$ 20–40/mês**.
@@ -125,7 +129,7 @@ Como `baita.ac` é Google Workspace e o projeto está na organização:
 
 ## 5. Fluxo de uso
 
-1. Abrir **https://claude.baita.ac** no celular → login `@baita.ac`.
+1. Abrir a **control_url** (`https://claude.<ip>.nip.io`) no celular → login `@baita.ac`.
 2. Se a VM estiver dormindo, **Acordar** → redireciona em segundos.
 3. Cair no editor + terminal com a **sessão do Claude já viva**.
 4. Pedir uma tarefa de browser/computer-use → abrir o **noVNC** e assistir.

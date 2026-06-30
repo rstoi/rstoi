@@ -21,14 +21,25 @@ variable "domain" {
 
 variable "app_hostname" {
   type        = string
-  description = "Hostname público do app (code-server/editor/terminal). Ex.: app.baita.ac"
-  default     = "app.baita.ac"
+  description = <<-EOT
+    Hostname público do app (code-server/editor/terminal).
+    Deixe VAZIO para derivar automaticamente do IP fixo via wildcard DNS
+    (ex.: app.34-8-1-2.nip.io) — não exige acesso a nenhum DNS.
+    Preencha só se você controlar um domínio e quiser um nome próprio.
+  EOT
+  default     = ""
 }
 
 variable "control_hostname" {
   type        = string
-  description = "Hostname da landing/wake (acorda a VM e redireciona). Ex.: claude.baita.ac"
-  default     = "claude.baita.ac"
+  description = "Hostname da landing/wake. Vazio = derivado do IP fixo (claude.<ip>.nip.io)."
+  default     = ""
+}
+
+variable "wildcard_dns_suffix" {
+  type        = string
+  description = "Serviço de DNS curinga p/ derivar hostnames do IP fixo quando você não controla um domínio. nip.io ou sslip.io."
+  default     = "nip.io"
 }
 
 variable "machine_type" {

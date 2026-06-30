@@ -4,9 +4,17 @@ region            = "us-central1"
 zone              = "us-central1-a"
 
 domain            = "baita.ac"
-app_hostname      = "app.baita.ac"
-control_hostname  = "claude.baita.ac"
 iap_support_email = "renato@baita.ac"
+
+# Hostnames: deixe vazios para derivar do IP fixo via nip.io (sem precisar de
+# acesso ao DNS do baita.ac, que está no Cloudflare). O login continua restrito
+# a @baita.ac pelo IAP, independentemente do nome da URL.
+app_hostname        = ""
+control_hostname    = ""
+wildcard_dns_suffix = "nip.io"   # ou "sslip.io"
+# Se um dia você controlar um domínio, basta preencher:
+# app_hostname     = "app.exemplo.com"
+# control_hostname = "claude.exemplo.com"
 
 machine_type          = "e2-standard-4"
 disk_size_gb          = 80

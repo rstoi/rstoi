@@ -50,7 +50,7 @@ resource "google_cloud_run_v2_service" "control" {
       }
       env {
         name  = "APP_URL"
-        value = "https://${var.app_hostname}"
+        value = "https://${local.app_host}"
       }
     }
   }
