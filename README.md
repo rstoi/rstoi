@@ -129,3 +129,8 @@ npm test          # vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 ```
+
+## Agents
+
+- `npm run agent` — WhatsApp `/setup` agent (executes shell commands from authorized groups). See `docs/COMANDOS-WHATSAPP.md`.
+- `npm run cio-report` — CIO agent: read-only daily executive summary sent to the `Baita TI` WhatsApp group. See `docs/AGENTE-CIO.md`.
