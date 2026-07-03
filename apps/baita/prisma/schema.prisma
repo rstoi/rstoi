@@ -1,0 +1,1003 @@
+// Baita Financial Intelligence OS — schema de dados
+// Modelo canônico para diagnóstico financeiro contínuo, governança e desenvolvimento organizacional.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  ADMIN
+  CONSULTANT
+  ANALYST
+  COMPANY_OWNER
+  COMPANY_FINANCE
+  COMPANY_DIRECTOR
+  ACCOUNTANT
+  AUDITOR
+}
+
+enum CareerStage {
+  BEGINNER
+  GROWING
+  SENIOR
+  PHASEOUT
+}
+
+enum AdizesLifecycleStage {
+  COURTSHIP
+  INFANCY
+  GO_GO
+  ADOLESCENCE
+  PRIME
+  STABILITY
+  ARISTOCRACY
+  EARLY_BUREAUCRACY
+  BUREAUCRACY
+  DEATH
+  UNKNOWN
+}
+
+enum DataSourceType {
+  BANK_STATEMENT
+  ISSUED_INVOICE
+  RECEIVED_INVOICE
+  ACCOUNTING_BOOK
+  GOVERNMENT_DECLARATION
+  ERP
+  CLOUD_FILE
+  EMAIL
+  MESSAGING
+  CONTRACT
+  SPREADSHEET
+  CREDIT_BUREAU
+  TAX
+  LEGAL
+  BENCHMARK
+  OTHER
+}
+
+enum ProcessingStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  PROCESSED_WITH_WARNINGS
+  FAILED
+  NEEDS_REVIEW
+}
+
+enum FinancialEventKind {
+  CASH_IN
+  CASH_OUT
+  REVENUE
+  COST
+  EXPENSE
+  INVESTMENT
+  DEBT_PRINCIPAL
+  DEBT_INTEREST
+  TAX
+  TRANSFER
+  ADJUSTMENT
+  UNKNOWN
+}
+
+enum DreLine {
+  GROSS_REVENUE
+  SALES_DEDUCTIONS
+  NET_REVENUE
+  VARIABLE_COSTS
+  CONTRIBUTION_MARGIN
+  FIXED_EXPENSES
+  EBITDA
+  FINANCIAL_EXPENSES
+  NON_RECURRING
+  MANAGEMENT_RESULT
+  NOT_APPLICABLE
+}
+
+enum ReliabilityRating {
+  A
+  B
+  C
+  D
+  E
+  UNKNOWN
+}
+
+enum ForecastScenario {
+  CONSERVATIVE
+  BASE
+  OPTIMISTIC
+}
+
+enum RecommendationArea {
+  TREASURY
+  CREDIT
+  INVESTMENT
+  COST_REDUCTION
+  COLLECTION
+  PRICING
+  GOVERNANCE
+  PEOPLE
+  OPERATIONS
+  SALES
+  STRATEGY
+}
+
+enum RecommendationStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  DISCARDED
+}
+
+enum DecisionStatus {
+  PLANNED
+  EXECUTED
+  CANCELLED
+  OVERDUE
+}
+
+enum PDCAStatus {
+  PLAN
+  DO
+  CHECK
+  ACT
+  CLOSED
+}
+
+enum ImprovementStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  VERIFIED
+}
+
+enum ReportType {
+  INITIAL_DIAGNOSIS
+  WEEKLY_TREASURY
+  MONTHLY_FINANCIAL
+  GOVERNANCE
+  BACKTESTING
+  EXECUTIVE_SUMMARY
+  AUDIT
+}
+
+enum RecurrenceType {
+  ONE_OFF
+  RECURRING_MONTHLY
+  RECURRING_WEEKLY
+  RECURRING_ANNUAL
+  UNKNOWN
+}
+
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReceivableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  WRITTEN_OFF
+}
+
+enum PayableStatus {
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  RENEGOTIATED
+}
+
+enum TaxStatus {
+  OPEN
+  PAID
+  OVERDUE
+  INSTALLMENT
+}
+
+enum ReconciliationType {
+  BANK_VS_DOCUMENT
+  ERP_VS_BANK
+  CONTRACT_VS_OBLIGATION
+  EMAIL_VS_BOLETO
+  OTHER
+}
+
+enum ReconciliationStatus {
+  PENDING
+  MATCHED
+  DIVERGENT
+  IGNORED
+}
+
+enum GovernanceRitualType {
+  TREASURY_WEEKLY
+  MONTHLY_CLOSING
+  QUARTERLY_STRATEGIC
+  BOARD_MEETING
+  COMMITTEE
+  OTHER
+}
+
+enum CycleStage {
+  CYCLE_0_SCOPE
+  CYCLE_1_CASH
+  CYCLE_2_DRE
+  CYCLE_3_FINANCIAL_POSITION
+  CYCLE_4_FORECAST
+  CYCLE_5_RECONCILIATION
+  CYCLE_6_BACKTESTING
+  RECURRING
+}
+
+enum CycleStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+// ============================================================
+// AUTENTICAÇÃO / RBAC
+// ============================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(ANALYST)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  companyAccess    CompanyUserAccess[]
+  uploadedFiles    UploadedFile[]
+  auditLogs        AuditLog[]
+  decisionsDecided Decision[]
+  reportsGenerated Report[]
+  sessions         Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// Isolamento por empresa: relação explícita de acesso de usuário a empresa.
+model CompanyUserAccess {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, userId])
+}
+
+// ============================================================
+// EMPRESA E CICLOS DE IMPLANTAÇÃO
+// ============================================================
+
+model Company {
+  id                       String               @id @default(cuid())
+  name                     String
+  legalName                String?
+  cnpj                     String?
+  industry                 String?
+  revenueRange             String?
+  employeeRange            String?
+  lifecycleStageAdizes     AdizesLifecycleStage @default(UNKNOWN)
+  lifecycleStageConfidence Float                @default(0)
+  maturityScore            Float?
+  managementSystemLevel    Int                  @default(0)
+  mainPains                String?
+  perceivedStage           String?
+  existingSystems          String?
+  banksUsed                String?
+  notes                    String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  people                 Person[]
+  dataSources            DataSource[]
+  uploadedFiles          UploadedFile[]
+  extractedDocuments     ExtractedDocument[]
+  financialEvents        FinancialEvent[]
+  managementCategories   ManagementCategory[]
+  receivables            Receivable[]
+  payables               Payable[]
+  debts                  Debt[]
+  taxObligations         TaxObligation[]
+  forecasts              Forecast[]
+  dres                   DRE[]
+  reconciliations        Reconciliation[]
+  recommendations        Recommendation[]
+  decisions              Decision[]
+  backtestingRuns        BacktestingRun[]
+  pdcaRecords            PDCARecord[]
+  improvementActions     ImprovementAction[]
+  governanceRituals      GovernanceRitual[]
+  meetingRecords         MeetingRecord[]
+  directorEvaluations    DirectorEvaluation[]
+  humanInteractions      HumanInteraction[]
+  auditLogs              AuditLog[]
+  reports                Report[]
+  cycles                 ImplementationCycle[]
+  userAccess             CompanyUserAccess[]
+}
+
+model ImplementationCycle {
+  id          String      @id @default(cuid())
+  companyId   String
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stage       CycleStage
+  status      CycleStatus @default(NOT_STARTED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([companyId, stage])
+}
+
+model Person {
+  id                       String      @id @default(cuid())
+  companyId                String
+  company                  Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name                     String
+  email                    String?
+  phone                    String?
+  formalRole               String?
+  realRole                 String?
+  careerStage              CareerStage @default(GROWING)
+  communicationPreference  String?
+  preferredChannel         String?
+  preferredFormat          String?
+  averageResponseTimeHours Float?
+  reliabilityNotes         String?
+  overloadRisk             String?
+  bestInteractionWindow    String?
+  active                   Boolean     @default(true)
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+
+  dataSourcesOwned        DataSource[]
+  uploadedFiles           UploadedFile[]
+  recommendationsOwned    Recommendation[]
+  decisionsDecided        Decision[]
+  pdcaOwned               PDCARecord[]
+  improvementActionsOwned ImprovementAction[]
+  ritualsOwned            GovernanceRitual[]
+  humanInteractions       HumanInteraction[]
+  topicReliabilities      PersonTopicReliability[]
+}
+
+// Confiabilidade por tema (inteligência humana)
+model PersonTopicReliability {
+  id        String            @id @default(cuid())
+  personId  String
+  person    Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  topic     String
+  rating    ReliabilityRating @default(UNKNOWN)
+  notes     String?
+  updatedAt DateTime          @updatedAt
+  createdAt DateTime          @default(now())
+
+  @@unique([personId, topic])
+}
+
+// ============================================================
+// FONTES DE DADOS E ARQUIVOS
+// ============================================================
+
+model DataSource {
+  id                 String            @id @default(cuid())
+  companyId          String
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type               DataSourceType
+  name               String
+  description        String?
+  ownerPersonId      String?
+  ownerPerson        Person?           @relation(fields: [ownerPersonId], references: [id])
+  availabilityStatus String            @default("PENDING")
+  accessStatus       String            @default("PENDING")
+  confidenceInitial  ReliabilityRating @default(UNKNOWN)
+  periodStart        DateTime?
+  periodEnd          DateTime?
+  format             String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  uploadedFiles UploadedFile[]
+}
+
+model UploadedFile {
+  id                   String           @id @default(cuid())
+  companyId            String
+  company              Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  dataSourceId         String?
+  dataSource           DataSource?      @relation(fields: [dataSourceId], references: [id])
+  originalFileName     String
+  storedPath           String
+  mimeType             String
+  sizeBytes            Int
+  hash                 String
+  periodStart          DateTime?
+  periodEnd            DateTime?
+  uploadedById         String?
+  uploadedBy           User?            @relation(fields: [uploadedById], references: [id])
+  uploadedByPersonId   String?
+  uploadedByPerson     Person?          @relation(fields: [uploadedByPersonId], references: [id])
+  processingStatus     ProcessingStatus @default(UPLOADED)
+  extractionConfidence Float?
+  processingNotes      String?
+  metadataJson         Json?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  extractedDocuments ExtractedDocument[]
+}
+
+model ExtractedDocument {
+  id              String       @id @default(cuid())
+  companyId       String
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedFileId  String
+  uploadedFile    UploadedFile @relation(fields: [uploadedFileId], references: [id], onDelete: Cascade)
+  documentType    String
+  extractedJson   Json
+  extractionNotes String?
+  confidence      Float        @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  financialEvents FinancialEvent[]
+}
+
+// ============================================================
+// EVENTOS FINANCEIROS (BASE CANÔNICA)
+// ============================================================
+
+model ManagementCategory {
+  id            String              @id @default(cuid())
+  companyId     String
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name          String
+  parentId      String?
+  parent        ManagementCategory? @relation("CategoryParent", fields: [parentId], references: [id])
+  children      ManagementCategory[] @relation("CategoryParent")
+  dreLine       DreLine             @default(NOT_APPLICABLE)
+  cashFlowGroup String?
+  isActive      Boolean             @default(true)
+  ruleHints     String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  financialEvents FinancialEvent[]
+  dreLineItems    DRELineItem[]
+
+  @@unique([companyId, name, parentId])
+}
+
+model FinancialEvent {
+  id                    String              @id @default(cuid())
+  companyId             String
+  company               Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sourceType            DataSourceType
+  sourceId              String?
+  extractedDocumentId   String?
+  extractedDocument     ExtractedDocument?  @relation(fields: [extractedDocumentId], references: [id])
+  eventKind             FinancialEventKind  @default(UNKNOWN)
+  documentDate          DateTime?
+  competenceDate        DateTime?
+  financialDate         DateTime?
+  dueDate               DateTime?
+  grossAmount           Decimal             @db.Decimal(18, 2)
+  netAmount             Decimal             @db.Decimal(18, 2)
+  currency              String              @default("BRL")
+  counterpartyName      String?
+  counterpartyDocument  String?
+  originalDescription   String?
+  normalizedDescription String?
+  managementCategoryId  String?
+  managementCategory    ManagementCategory? @relation(fields: [managementCategoryId], references: [id])
+  costCenter            String?
+  businessUnit          String?
+  project               String?
+  status                String              @default("ACTIVE")
+  recurrenceType        RecurrenceType      @default(UNKNOWN)
+  criticality           Criticality         @default(MEDIUM)
+  reliabilityRating     ReliabilityRating   @default(UNKNOWN)
+  qualityRating         ReliabilityRating   @default(UNKNOWN)
+  auditabilityRating    ReliabilityRating   @default(UNKNOWN)
+  materialityRating     ReliabilityRating   @default(UNKNOWN)
+  isDuplicate           Boolean             @default(false)
+  duplicateOfId         String?
+  isTransfer            Boolean             @default(false)
+  needsReview           Boolean             @default(false)
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  receivables            Receivable[]
+  payables               Payable[]
+  primaryReconciliations Reconciliation[] @relation("PrimaryEvent")
+  relatedReconciliations Reconciliation[] @relation("RelatedEvent")
+
+  @@index([companyId, financialDate])
+  @@index([companyId, eventKind])
+}
+
+// ============================================================
+// CONTAS A RECEBER / PAGAR / DÍVIDAS / IMPOSTOS
+// ============================================================
+
+model Receivable {
+  id                  String           @id @default(cuid())
+  companyId           String
+  company              Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerName        String
+  customerDocument    String?
+  invoiceId           String?
+  amount              Decimal          @db.Decimal(18, 2)
+  dueDate             DateTime
+  expectedPaymentDate DateTime?
+  status              ReceivableStatus @default(OPEN)
+  probability         Float            @default(1)
+  sourceEventId       String?
+  sourceEvent         FinancialEvent?  @relation(fields: [sourceEventId], references: [id])
+  reliabilityRating   ReliabilityRating @default(UNKNOWN)
+  notes               String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+}
+
+model Payable {
+  id                String        @id @default(cuid())
+  companyId         String
+  company           Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierName      String
+  supplierDocument  String?
+  amount            Decimal       @db.Decimal(18, 2)
+  dueDate           DateTime
+  status            PayableStatus @default(OPEN)
+  criticality       Criticality   @default(MEDIUM)
+  renegotiable      Boolean       @default(false)
+  sourceEventId     String?
+  sourceEvent       FinancialEvent? @relation(fields: [sourceEventId], references: [id])
+  reliabilityRating ReliabilityRating @default(UNKNOWN)
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Debt {
+  id                       String            @id @default(cuid())
+  companyId                String
+  company                  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creditorName             String
+  debtType                 String
+  principalBalance         Decimal           @db.Decimal(18, 2)
+  interestRateMonthly      Float?
+  interestRateAnnual       Float?
+  installmentAmount        Decimal?          @db.Decimal(18, 2)
+  nextDueDate              DateTime?
+  maturityDate             DateTime?
+  guarantees               String?
+  renegotiationPossibility String?
+  reliabilityRating        ReliabilityRating @default(UNKNOWN)
+  notes                    String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+}
+
+model TaxObligation {
+  id                String    @id @default(cuid())
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taxType           String
+  competence        String
+  amount            Decimal   @db.Decimal(18, 2)
+  dueDate           DateTime
+  status            TaxStatus @default(OPEN)
+  source            String?
+  reliabilityRating ReliabilityRating @default(UNKNOWN)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ============================================================
+// DRE
+// ============================================================
+
+model DRE {
+  id                 String   @id @default(cuid())
+  companyId          String
+  company            Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  periodStart        DateTime
+  periodEnd          DateTime
+  grossRevenue       Decimal  @db.Decimal(18, 2)
+  salesDeductions    Decimal  @db.Decimal(18, 2)
+  netRevenue         Decimal  @db.Decimal(18, 2)
+  variableCosts      Decimal  @db.Decimal(18, 2)
+  contributionMargin Decimal  @db.Decimal(18, 2)
+  fixedExpenses      Decimal  @db.Decimal(18, 2)
+  ebitda             Decimal  @db.Decimal(18, 2)
+  financialExpenses  Decimal  @db.Decimal(18, 2)
+  nonRecurring       Decimal  @db.Decimal(18, 2)
+  managementResult   Decimal  @db.Decimal(18, 2)
+  confidenceScore    Float    @default(0)
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  lineItems DRELineItem[]
+
+  @@unique([companyId, periodStart, periodEnd])
+}
+
+model DRELineItem {
+  id         String              @id @default(cuid())
+  dreId      String
+  dre        DRE                 @relation(fields: [dreId], references: [id], onDelete: Cascade)
+  categoryId String?
+  category   ManagementCategory? @relation(fields: [categoryId], references: [id])
+  label      String
+  dreLine    DreLine
+  amount     Decimal             @db.Decimal(18, 2)
+  confidence Float               @default(0)
+  notes      String?
+}
+
+// ============================================================
+// CONCILIAÇÃO
+// ============================================================
+
+model Reconciliation {
+  id                    String               @id @default(cuid())
+  companyId             String
+  company               Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  primaryEventId        String
+  primaryEvent          FinancialEvent       @relation("PrimaryEvent", fields: [primaryEventId], references: [id])
+  relatedEventId        String?
+  relatedEvent          FinancialEvent?      @relation("RelatedEvent", fields: [relatedEventId], references: [id])
+  reconciliationType    ReconciliationType
+  divergenceAmount      Decimal?             @db.Decimal(18, 2)
+  divergenceDescription String?
+  status                ReconciliationStatus @default(PENDING)
+  reliabilityRating     ReliabilityRating    @default(UNKNOWN)
+  notes                 String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+}
+
+// ============================================================
+// FORECAST
+// ============================================================
+
+model Forecast {
+  id              String           @id @default(cuid())
+  companyId       String
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name            String
+  forecastDate    DateTime         @default(now())
+  horizonStart    DateTime
+  horizonEnd      DateTime
+  scenario        ForecastScenario
+  assumptionsJson Json?
+  confidenceScore Float            @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  lines           ForecastLine[]
+  backtestingRuns BacktestingRun[]
+}
+
+model ForecastLine {
+  id                   String   @id @default(cuid())
+  forecastId           String
+  forecast             Forecast @relation(fields: [forecastId], references: [id], onDelete: Cascade)
+  date                 DateTime
+  openingBalance       Decimal  @db.Decimal(18, 2)
+  confirmedInflows     Decimal  @db.Decimal(18, 2)
+  probableInflows      Decimal  @db.Decimal(18, 2)
+  possibleInflows      Decimal  @db.Decimal(18, 2)
+  mandatoryOutflows    Decimal  @db.Decimal(18, 2)
+  renegotiableOutflows Decimal  @db.Decimal(18, 2)
+  deferrableOutflows   Decimal  @db.Decimal(18, 2)
+  closingBalance       Decimal  @db.Decimal(18, 2)
+  notes                String?
+  confidence           Float    @default(0)
+
+  @@index([forecastId, date])
+}
+
+// ============================================================
+// RECOMENDAÇÕES E DECISÕES
+// ============================================================
+
+model Recommendation {
+  id                      String               @id @default(cuid())
+  companyId               String
+  company                 Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  title                   String
+  description             String
+  area                    RecommendationArea
+  urgency                 Criticality          @default(MEDIUM)
+  impact                  Criticality          @default(MEDIUM)
+  confidence              ReliabilityRating    @default(UNKNOWN)
+  evidenceJson            Json?
+  expectedFinancialImpact Decimal?             @db.Decimal(18, 2)
+  deadline                DateTime?
+  ownerPersonId           String?
+  ownerPerson             Person?              @relation(fields: [ownerPersonId], references: [id])
+  status                  RecommendationStatus @default(OPEN)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+
+  decisions Decision[]
+}
+
+model Decision {
+  id                 String            @id @default(cuid())
+  companyId          String
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recommendationId   String?
+  recommendation     Recommendation?   @relation(fields: [recommendationId], references: [id])
+  title              String
+  decisionText       String
+  decidedByUserId    String?
+  decidedByUser      User?             @relation(fields: [decidedByUserId], references: [id])
+  decidedByPersonId  String?
+  decidedByPerson    Person?           @relation(fields: [decidedByPersonId], references: [id])
+  decisionDate       DateTime          @default(now())
+  scenarioConsidered ForecastScenario?
+  informationRating  ReliabilityRating @default(UNKNOWN)
+  expectedImpact     String?
+  actualImpact       String?
+  responsiblePerson  String?
+  deadline           DateTime?
+  status             DecisionStatus    @default(PLANNED)
+  evidenceJson       Json?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+// ============================================================
+// BACKTESTING
+// ============================================================
+
+model BacktestingRun {
+  id                   String            @id @default(cuid())
+  companyId            String
+  company              Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  forecastId           String
+  forecast             Forecast          @relation(fields: [forecastId], references: [id])
+  runDate              DateTime          @default(now())
+  periodStart          DateTime
+  periodEnd            DateTime
+  totalAbsoluteError   Decimal           @db.Decimal(18, 2)
+  totalPercentageError Float
+  bias                 String
+  accuracyScore        Float
+  notes                String?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  lines BacktestingLine[]
+}
+
+model BacktestingLine {
+  id                       String         @id @default(cuid())
+  backtestingRunId         String
+  backtestingRun           BacktestingRun @relation(fields: [backtestingRunId], references: [id], onDelete: Cascade)
+  date                     DateTime
+  category                 String
+  predictedAmount          Decimal        @db.Decimal(18, 2)
+  actualAmount             Decimal        @db.Decimal(18, 2)
+  absoluteError            Decimal        @db.Decimal(18, 2)
+  percentageError          Float
+  cause                    String?
+  adjustmentRecommendation String?
+}
+
+// ============================================================
+// PDCA E MELHORIA CONTÍNUA
+// ============================================================
+
+model PDCARecord {
+  id            String     @id @default(cuid())
+  companyId     String
+  company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cycleName     String
+  planText      String
+  doText        String?
+  checkText     String?
+  actText       String?
+  status        PDCAStatus @default(PLAN)
+  ownerPersonId String?
+  ownerPerson   Person?    @relation(fields: [ownerPersonId], references: [id])
+  dueDate       DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model ImprovementAction {
+  id               String            @id @default(cuid())
+  companyId        String
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  problem          String
+  rootCause        String?
+  correctiveAction String?
+  preventiveAction String?
+  ownerPersonId    String?
+  ownerPerson      Person?           @relation(fields: [ownerPersonId], references: [id])
+  dueDate          DateTime?
+  status           ImprovementStatus @default(OPEN)
+  expectedImpact   String?
+  observedResult   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+// ============================================================
+// GOVERNANÇA E DIRETORIA
+// ============================================================
+
+model GovernanceRitual {
+  id             String               @id @default(cuid())
+  companyId      String
+  company        Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name           String
+  type           GovernanceRitualType
+  frequency      String
+  ownerPersonId  String?
+  ownerPerson    Person?              @relation(fields: [ownerPersonId], references: [id])
+  agendaTemplate String?
+  active         Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  meetingRecords MeetingRecord[]
+}
+
+model MeetingRecord {
+  id              String            @id @default(cuid())
+  companyId       String
+  company         Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  ritualId        String?
+  ritual          GovernanceRitual? @relation(fields: [ritualId], references: [id])
+  date            DateTime
+  title           String
+  agenda          String?
+  notes           String?
+  decisionsJson   Json?
+  actionItemsJson Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model DirectorEvaluation {
+  id                        String   @id @default(cuid())
+  companyId                 String
+  company                   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  periodStart               DateTime
+  periodEnd                 DateTime
+  strategicLeadershipScore  Float
+  executionDisciplineScore  Float
+  governanceScore           Float
+  financialManagementScore  Float
+  cooperationScore          Float
+  commercialGrowthScore     Float
+  systemsProcessesScore     Float
+  learningDevelopmentScore  Float
+  totalScore                Float
+  notes                     String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  items DirectorEvaluationItem[]
+}
+
+model DirectorEvaluationItem {
+  id               String             @id @default(cuid())
+  evaluationId     String
+  evaluation       DirectorEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  dimension        String
+  criterion        String
+  description      String?
+  expectedEvidence String?
+  score            Int
+  evidenceNotes    String?
+  recommendation   String?
+}
+
+// ============================================================
+// PERFIL HUMANO / INTERAÇÕES
+// ============================================================
+
+model HumanInteraction {
+  id                      String            @id @default(cuid())
+  companyId               String
+  company                 Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  personId                String
+  person                  Person            @relation(fields: [personId], references: [id], onDelete: Cascade)
+  channel                 String
+  purpose                 String
+  messageText             String
+  responseText            String?
+  sentAt                  DateTime          @default(now())
+  respondedAt             DateTime?
+  responseQuality         Int?
+  responseCompleteness    Int?
+  responseReliability     ReliabilityRating @default(UNKNOWN)
+  resultingEvidenceRating ReliabilityRating @default(UNKNOWN)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+}
+
+// ============================================================
+// AUDITORIA
+// ============================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId   String?
+  company     Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actorUserId String?
+  actorUser   User?    @relation(fields: [actorUserId], references: [id])
+  agentName   String?
+  action      String
+  entityType  String
+  entityId    String?
+  beforeJson  Json?
+  afterJson   Json?
+  rationale   String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// ============================================================
+// RELATÓRIOS
+// ============================================================
+
+model Report {
+  id              String     @id @default(cuid())
+  companyId       String
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  reportType      ReportType
+  title           String
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  htmlContent     String
+  pdfPath         String?
+  confidenceScore Float      @default(0)
+  generatedById   String?
+  generatedBy     User?      @relation(fields: [generatedById], references: [id])
+  generatedAt     DateTime   @default(now())
+  version         Int        @default(1)
+}
