@@ -106,6 +106,32 @@ When modifying either file, keep/extend the existing vitest coverage
 (`tests/guard.test.ts`, `tests/agent-auth.test.ts`) — these encode the
 security invariants, not just behavior.
 
+## Secrets & sensitive data
+
+This server handles real credentials and real message content — treat both
+as sensitive by default:
+
+- **Never** print, log, or commit `WA_ACCESS_TOKEN`, `WA_WEBHOOK_SECRET`,
+  `ANTHROPIC_API_KEY`, or anything from `.env`. `.env` is gitignored; keep it
+  that way, and don't echo its contents into command output that gets
+  captured (e.g. `/setup` replies, status dashboards).
+- `data/*.db` contains real WhatsApp message history/contacts once populated
+  — it's gitignored and must stay that way. When adding status/reporting
+  tooling (`gen-status.js`, `status-server.js` and friends), surface counts/
+  metadata only, never raw message text or contact PII.
+- The `/setup` bot (`scripts/wa-agent.ts`) echoes command output back into a
+  WhatsApp chat — be mindful that `runBash` output (env dumps, file reads)
+  could leak secrets into a group chat. Don't widen what it can execute
+  without re-checking this.
+
+## Commit discipline
+
+When asked to commit, keep each commit to one logical change (bisectable) —
+don't bundle an unrelated fix with a feature, or a doc update with a
+behavior change, in the same commit. This matters especially for
+`guard.ts`/`agent-auth.ts` changes: a reviewer (or a future `git bisect`)
+should be able to isolate a security-relevant change from unrelated cleanup.
+
 ## Development workflow
 
 ```bash
