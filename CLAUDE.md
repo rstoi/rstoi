@@ -2,14 +2,6 @@
 
 Guidance for AI assistants (Claude Code) working in this repository.
 
-## Keeping this file current
-
-Treat this file as living documentation, not a one-time write-up. When a
-session gets corrected on something — a wrong adapter assumed, a guardrail
-almost bypassed, a convention broken — update the relevant section here so
-future sessions don't repeat the mistake, instead of just fixing the one
-instance and moving on.
-
 ## What this repo is
 
 A **WhatsApp Business MCP server** (`whatsapp-business-mcp`, package name in
@@ -88,110 +80,49 @@ as stale documentation, not a contract.
 tools are registered even if WhatsApp login/network isn't ready yet; tools
 that need the connection will error until login completes.
 
-## The guard/authorization layer (security-critical — read before editing)
+## Security — read before touching either of these
 
-Two independent, defense-in-depth mechanisms gate what agents can do over
-WhatsApp. Both are **deny-by-default**. Preserve that property in any change.
+Two things in this repo are security-critical.
 
-1. **`src/guard.ts`** (`guardAdapter`) — wraps *every* `WhatsAppAdapter` in a
-   `Proxy` per `WA_BLOCKED_GROUPS` (comma-separated names/JIDs, currently
-   `financasfacil`). It blocks send/edit/delete/react/read/manage on those
-   chats, filters them out of `list_groups`/`list_conversations`, and drops
-   their inbound messages from `onMessage`. Applied centrally in
-   `createMcpServer` (`src/server.ts`) and again around the webhook adapter —
-   this is the single choke point; don't bypass it by calling an adapter
-   directly elsewhere. `src/guard.ts` also has `getBlockedChatIds()` for
-   direct-DB reads (e.g. `search_messages`) that don't go through the adapter.
-2. **`src/agent-auth.ts`** — authorizes the `/setup` command handled by
-   `scripts/wa-agent.ts`, which executes arbitrary shell via the Claude API's
-   bash tool. Authorized only if the sender is in a scoped group
-   (`WA_AGENT_GROUPS`) or an explicit allowlist (`WA_AGENT_ALLOWED_SENDERS`).
-   **If both are empty, nobody is authorized** — this is intentional (never
-   open RCE). See `docs/COMANDOS-WHATSAPP.md` for the exact behavior and
-   examples.
+**1. Guard & authorization layer.** Two independent, deny-by-default
+mechanisms gate what agents can do over WhatsApp. Preserve that property in
+any change.
+
+- **`src/guard.ts`** (`guardAdapter`) — wraps *every* `WhatsAppAdapter` in a
+  `Proxy` per `WA_BLOCKED_GROUPS` (comma-separated names/JIDs, currently
+  `financasfacil`). Blocks send/edit/delete/react/read/manage on those chats,
+  filters them out of `list_groups`/`list_conversations`, and drops their
+  inbound messages from `onMessage`. Applied centrally in `createMcpServer`
+  (`src/server.ts`) and again around the webhook adapter — the single choke
+  point; don't bypass it by calling an adapter directly elsewhere. Also
+  exposes `getBlockedChatIds()` for direct-DB reads (e.g. `search_messages`)
+  that skip the adapter.
+- **`src/agent-auth.ts`** — authorizes the `/setup` command handled by
+  `scripts/wa-agent.ts`, which executes arbitrary shell via the Claude API's
+  bash tool. Authorized only if the sender is in a scoped group
+  (`WA_AGENT_GROUPS`) or an explicit allowlist (`WA_AGENT_ALLOWED_SENDERS`).
+  **Both empty → nobody is authorized** — intentional, never open RCE. See
+  `docs/COMANDOS-WHATSAPP.md` for exact behavior and examples.
 
 When modifying either file, keep/extend the existing vitest coverage
-(`tests/guard.test.ts`, `tests/agent-auth.test.ts`) — these encode the
-security invariants, not just behavior.
+(`tests/guard.test.ts`, `tests/agent-auth.test.ts`) — these encode security
+invariants, not just behavior.
 
-## Secrets & sensitive data
-
-This server handles real credentials and real message content — treat both
-as sensitive by default:
+**2. Secrets & sensitive data.** This server handles real credentials and
+real message content:
 
 - **Never** print, log, or commit `WA_ACCESS_TOKEN`, `WA_WEBHOOK_SECRET`,
-  `ANTHROPIC_API_KEY`, or anything from `.env`. `.env` is gitignored; keep it
-  that way, and don't echo its contents into command output that gets
-  captured (e.g. `/setup` replies, status dashboards).
-- `data/*.db` contains real WhatsApp message history/contacts once populated
-  — it's gitignored and must stay that way. When adding status/reporting
-  tooling (`gen-status.js`, `status-server.js` and friends), surface counts/
-  metadata only, never raw message text or contact PII.
-- The `/setup` bot (`scripts/wa-agent.ts`) echoes command output back into a
-  WhatsApp chat — be mindful that `runBash` output (env dumps, file reads)
-  could leak secrets into a group chat. Don't widen what it can execute
-  without re-checking this.
-
-## Commit discipline
-
-When asked to commit, keep each commit to one logical change (bisectable) —
-don't bundle an unrelated fix with a feature, or a doc update with a
-behavior change, in the same commit. This matters especially for
-`guard.ts`/`agent-auth.ts` changes: a reviewer (or a future `git bisect`)
-should be able to isolate a security-relevant change from unrelated cleanup.
-
-## Engineering discipline
-
-- **Don't assume — ask.** If a request is ambiguous about which adapter
-  (`cloud-api`/`http`/`playwright`), which env var, or which tool/resource is
-  meant, say what's unclear rather than guessing.
-- **Minimum code for the task.** Don't add config flags, new abstractions, or
-  defensive error handling for scenarios that can't happen — this repo's
-  existing code (`config.ts`, `agent-auth.ts`) is deliberately thin; match
-  that, don't "harden" it speculatively.
-- **Surgical changes.** Fixing one adapter or tool shouldn't touch sibling
-  adapters/tools or reformat unrelated code in the same diff, even if you
-  notice something else worth fixing — mention it instead.
-- **Verify before calling it done.** Define what "done" means before you
-  start (e.g. "test X reproduces the bug, then passes"), and check it: run
-  `npm test` (add/extend a test in `tests/` for behavior changes,
-  especially anything touching `guard.ts`/`agent-auth.ts`), `npm run
-  typecheck`, and `npm run mcp:smoke` for tool/resource-surface changes.
-  Don't report a change as working without having run these.
-- **Check before building custom.** Before adding a new dependency, adapter,
-  or standalone script, check whether an existing library or something
-  already in this repo solves it. This doesn't mean re-litigating existing
-  deliberate choices (e.g. the hand-rolled `.env` parser in `config.ts`
-  instead of `dotenv`) — just don't reach for a new package/abstraction
-  without checking first.
-- **No surprise GitHub writes.** When posting a PR/issue comment, updating a
-  PR, or otherwise writing to GitHub on this repo, say so in the same turn
-  with the URL — never post publicly without surfacing it in chat.
-
-## Iterating to saturation (PDCA)
-
-For open-ended improvement work in this repo (review-and-fix passes,
-CI/PR babysitting, simplification sweeps) — not one-shot fixes — iterate as
-Plan → Do → Check → Act instead of a single pass:
-
-1. **Plan** — state the goal as a verifiable success criterion (see "Verify
-   before calling it done" above), e.g. "no findings from `/code-review`" or
-   "CI green on this PR."
-2. **Do** — make the smallest change that addresses the current gap.
-3. **Check** — re-run the same check that defined the goal (`npm test`,
-   `/code-review`, CI status, `mcp:smoke`).
-4. **Act** — if the check found something new, loop back to Plan with that
-   finding; if not, stop.
-
-**Stop at saturation, not on a timer.** Keep iterating only while a round
-produces a verifiable improvement (a fix that changes the check's outcome).
-Once a round finds nothing new — the same findings repeat, or CI is green
-with no more failures — stop; don't keep spinning for cosmetic changes. For
-recurring/unattended iteration (e.g. babysitting a PR across multiple CI
-runs, or a scheduled review sweep), use the `/loop` skill or a subscribed
-PR-activity session rather than manual polling — but the same stop
-condition applies: re-kick on a real failure, go quiet once nothing
-actionable remains.
+  `ANTHROPIC_API_KEY`, or anything from `.env` (gitignored — keep it that
+  way). Don't echo `.env` contents into captured output (`/setup` replies,
+  status dashboards).
+- `data/*.db` holds real WhatsApp history/contacts once populated —
+  gitignored, must stay that way. Status/reporting tooling (`gen-status.js`,
+  `status-server.js`) may surface counts/metadata only, never raw message
+  text or contact PII.
+- `scripts/wa-agent.ts`'s `/setup` bot echoes shell output back into a
+  WhatsApp chat — `runBash` output (env dumps, file reads) could leak
+  secrets into a group. Don't widen what it can execute without re-checking
+  this.
 
 ## Development workflow
 
@@ -218,7 +149,7 @@ Config is `.env` at repo root (see `.env.example`), loaded by a small
 hand-rolled parser in `src/config.ts` — no `dotenv` dependency. Existing
 `process.env` values always win over `.env` file values.
 
-## Conventions
+## Code conventions
 
 - **ESM + explicit `.js` extensions** in all relative imports (e.g.
   `import { config } from "./config.js"` inside `src/config.ts`'s own
@@ -242,6 +173,53 @@ hand-rolled parser in `src/config.ts` — no `dotenv` dependency. Existing
   `src/resources/index.ts`, `src/prompts/index.ts`) — add new ones there
   rather than registering directly in `server.ts`.
 
+## Working conventions
+
+**Keep this file current.** Treat it as living documentation. When a session
+gets corrected on something — a wrong adapter assumed, a guardrail almost
+bypassed, a convention broken — update the relevant section here instead of
+just fixing the one instance.
+
+**Commits.** One logical change per commit (bisectable) — don't bundle an
+unrelated fix with a feature, or a doc update with a behavior change.
+Matters most for `guard.ts`/`agent-auth.ts`: a reviewer (or `git bisect`)
+should be able to isolate a security-relevant change from unrelated cleanup.
+
+**Engineering discipline:**
+- **Don't assume — ask.** Ambiguous which adapter, env var, or tool/resource
+  is meant? Say what's unclear rather than guessing.
+- **Minimum code for the task.** No config flags, abstractions, or defensive
+  error handling for scenarios that can't happen — match this repo's
+  deliberately thin style (`config.ts`, `agent-auth.ts`).
+- **Surgical changes.** Fixing one adapter/tool shouldn't touch siblings or
+  reformat unrelated code — mention other issues instead of fixing them.
+- **Verify before calling it done.** Define "done" as a check (`npm test`,
+  `npm run typecheck`, `npm run mcp:smoke` for tool/resource changes) and
+  run it before reporting success.
+- **Check before building custom.** Before a new dependency, adapter, or
+  script, check whether an existing library or something already in this
+  repo solves it — don't relitigate existing choices (e.g. the hand-rolled
+  `.env` parser instead of `dotenv`), just don't add new machinery blind.
+- **No surprise GitHub writes.** Posting a PR/issue comment or updating a PR
+  on this repo? Say so in the same turn with the URL.
+
+**Iterating to saturation (PDCA).** For open-ended improvement work
+(review-and-fix passes, CI/PR babysitting, simplification sweeps) — not
+one-shot fixes — iterate Plan → Do → Check → Act instead of a single pass:
+
+1. **Plan** — state the goal as a verifiable success criterion, e.g. "no
+   findings from `/code-review`" or "CI green on this PR."
+2. **Do** — make the smallest change that addresses the current gap.
+3. **Check** — re-run the same check that defined the goal.
+4. **Act** — new finding → loop back to Plan; nothing new → stop.
+
+Stop at saturation, not on a timer: keep iterating only while a round
+changes the check's outcome. Same findings repeating, or CI green with
+nothing left to fix, means stop. For recurring/unattended iteration (PR
+babysitting across CI runs, scheduled review sweeps), use the `/loop` skill
+or a subscribed PR-activity session instead of manual polling — same stop
+condition applies.
+
 ## Remote environment specifics
 
 This project expects to run inside Claude Code's ephemeral web container.
@@ -264,21 +242,19 @@ adapter) and `computer-use` (`src/computer-use/server.ts`, an xdotool/scrot
 based screen-control server against Xvfb display `:99`). Both are enabled via
 `enabledMcpjsonServers` in `.claude/settings.json`.
 
-## The `docs/` executive-deck pipeline
+## Other tooling
 
-`docs/build_docx.py`, `build_pptx.py`, `build_pdf.py`, `build_charts.py`,
-`render_pptx.py` are standalone Python scripts (deps in `requirements.txt`:
-`python-docx`, `python-pptx`, `matplotlib`, `Pillow`) that generate the
-setup.com.br executive document/deck/PDF checked into `docs/` from
-`docs/infraestrutura-ia-setup.md` and `docs/assets/`. These are unrelated to
-the MCP server's runtime — treat them as a separate, self-contained doc-build
-tool. Regenerate with `python3 docs/build_pdf.py` etc. after editing the
-source markdown or assets.
+**`docs/` executive-deck pipeline.** `docs/build_docx.py`, `build_pptx.py`,
+`build_pdf.py`, `build_charts.py`, `render_pptx.py` are standalone Python
+scripts (deps in `requirements.txt`: `python-docx`, `python-pptx`,
+`matplotlib`, `Pillow`) that generate the setup.com.br executive
+document/deck/PDF checked into `docs/` from `docs/infraestrutura-ia-setup.md`
+and `docs/assets/`. Unrelated to the MCP server's runtime — a separate,
+self-contained doc-build tool. Regenerate with `python3 docs/build_pdf.py`
+etc. after editing the source markdown or assets.
 
-## Status dashboard scripts
-
-`gen-status.js`, `status-server.js`, `status*.html` at the repo root generate
-a system/environment status page (memory, disk, git log, DB row counts,
-network reachability checks). These are operational tooling, independent of
-the MCP tool surface in `src/` — don't confuse them with the WhatsApp
-tools/resources.
+**Status dashboard scripts.** `gen-status.js`, `status-server.js`,
+`status*.html` at the repo root generate a system/environment status page
+(memory, disk, git log, DB row counts, network reachability checks).
+Operational tooling, independent of the MCP tool surface in `src/` — don't
+confuse them with the WhatsApp tools/resources.
