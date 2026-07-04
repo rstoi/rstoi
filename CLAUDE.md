@@ -168,6 +168,31 @@ should be able to isolate a security-relevant change from unrelated cleanup.
   PR, or otherwise writing to GitHub on this repo, say so in the same turn
   with the URL — never post publicly without surfacing it in chat.
 
+## Iterating to saturation (PDCA)
+
+For open-ended improvement work in this repo (review-and-fix passes,
+CI/PR babysitting, simplification sweeps) — not one-shot fixes — iterate as
+Plan → Do → Check → Act instead of a single pass:
+
+1. **Plan** — state the goal as a verifiable success criterion (see "Verify
+   before calling it done" above), e.g. "no findings from `/code-review`" or
+   "CI green on this PR."
+2. **Do** — make the smallest change that addresses the current gap.
+3. **Check** — re-run the same check that defined the goal (`npm test`,
+   `/code-review`, CI status, `mcp:smoke`).
+4. **Act** — if the check found something new, loop back to Plan with that
+   finding; if not, stop.
+
+**Stop at saturation, not on a timer.** Keep iterating only while a round
+produces a verifiable improvement (a fix that changes the check's outcome).
+Once a round finds nothing new — the same findings repeat, or CI is green
+with no more failures — stop; don't keep spinning for cosmetic changes. For
+recurring/unattended iteration (e.g. babysitting a PR across multiple CI
+runs, or a scheduled review sweep), use the `/loop` skill or a subscribed
+PR-activity session rather than manual polling — but the same stop
+condition applies: re-kick on a real failure, go quiet once nothing
+actionable remains.
+
 ## Development workflow
 
 ```bash
