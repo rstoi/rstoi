@@ -2,6 +2,14 @@
 
 Guidance for AI assistants (Claude Code) working in this repository.
 
+## Keeping this file current
+
+Treat this file as living documentation, not a one-time write-up. When a
+session gets corrected on something — a wrong adapter assumed, a guardrail
+almost bypassed, a convention broken — update the relevant section here so
+future sessions don't repeat the mistake, instead of just fixing the one
+instance and moving on.
+
 ## What this repo is
 
 A **WhatsApp Business MCP server** (`whatsapp-business-mcp`, package name in
