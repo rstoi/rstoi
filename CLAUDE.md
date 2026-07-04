@@ -132,6 +132,25 @@ behavior change, in the same commit. This matters especially for
 `guard.ts`/`agent-auth.ts` changes: a reviewer (or a future `git bisect`)
 should be able to isolate a security-relevant change from unrelated cleanup.
 
+## Engineering discipline
+
+- **Don't assume — ask.** If a request is ambiguous about which adapter
+  (`cloud-api`/`http`/`playwright`), which env var, or which tool/resource is
+  meant, say what's unclear rather than guessing.
+- **Minimum code for the task.** Don't add config flags, new abstractions, or
+  defensive error handling for scenarios that can't happen — this repo's
+  existing code (`config.ts`, `agent-auth.ts`) is deliberately thin; match
+  that, don't "harden" it speculatively.
+- **Surgical changes.** Fixing one adapter or tool shouldn't touch sibling
+  adapters/tools or reformat unrelated code in the same diff, even if you
+  notice something else worth fixing — mention it instead.
+- **Verify before calling it done.** Define what "done" means before you
+  start (e.g. "test X reproduces the bug, then passes"), and check it: run
+  `npm test` (add/extend a test in `tests/` for behavior changes,
+  especially anything touching `guard.ts`/`agent-auth.ts`), `npm run
+  typecheck`, and `npm run mcp:smoke` for tool/resource-surface changes.
+  Don't report a change as working without having run these.
+
 ## Development workflow
 
 ```bash
