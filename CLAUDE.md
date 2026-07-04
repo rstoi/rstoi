@@ -158,6 +158,15 @@ should be able to isolate a security-relevant change from unrelated cleanup.
   especially anything touching `guard.ts`/`agent-auth.ts`), `npm run
   typecheck`, and `npm run mcp:smoke` for tool/resource-surface changes.
   Don't report a change as working without having run these.
+- **Check before building custom.** Before adding a new dependency, adapter,
+  or standalone script, check whether an existing library or something
+  already in this repo solves it. This doesn't mean re-litigating existing
+  deliberate choices (e.g. the hand-rolled `.env` parser in `config.ts`
+  instead of `dotenv`) — just don't reach for a new package/abstraction
+  without checking first.
+- **No surprise GitHub writes.** When posting a PR/issue comment, updating a
+  PR, or otherwise writing to GitHub on this repo, say so in the same turn
+  with the URL — never post publicly without surfacing it in chat.
 
 ## Development workflow
 
