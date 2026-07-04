@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "setup:chrome": "bash scripts/install-chrome.sh",
     "connect": "tsx scripts/wa-connect.ts",
+    "onboard": "tsx scripts/onboard-claude-code.ts",
     "personal": "WA_ADAPTER=playwright tsx src/index.ts",
     "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts",
     "mcp:smoke": "node scripts/mcp-smoke.mjs"

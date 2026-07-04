@@ -2,6 +2,19 @@
 
 MCP server that integrates WhatsApp Business with Claude Code agents. Agents can send, read, edit, delete messages, manage groups, handle media, and more.
 
+## New to Claude Code?
+
+Run the onboarding wizard to generate a personalized `CLAUDE.md` (your role,
+priority connectors, human-approval rules) plus a first-15-minutes list of
+prompts to try:
+
+```bash
+npm run onboard
+```
+
+See `docs/infraestrutura-ia-setup.md` and `docs/SUGESTOES-FERRAMENTAS-IA.md`
+for the full agent/connector catalog this maps to.
+
 ## Quick Start
 
 ### 1. Install
