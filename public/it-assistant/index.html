@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Assistente de Infraestrutura de TI · baita</title>
+<link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+<header>
+  <div class="logo">🛰️</div>
+  <div>
+    <h1>Infraestrutura de TI</h1>
+    <div class="sub">Rede doméstica &amp; videoconferência · baita</div>
+  </div>
+  <div class="hright">
+    <a class="navlink" href="/guia">Guia de solução de problemas</a>
+    <div class="user" id="user"></div>
+    <button class="btn" id="logoutBtn">Sair</button>
+  </div>
+</header>
+
+<main>
+  <div id="banner"></div>
+
+  <div class="section-head">
+    <h2>Dispositivos monitorados</h2>
+    <button class="btn primary" id="addDeviceBtn">+ Adicionar dispositivo</button>
+  </div>
+  <div id="deviceGrid" class="grid"></div>
+
+  <div id="detailWrap"></div>
+
+  <div class="section-head">
+    <h2>Alertas ativos</h2>
+  </div>
+  <div id="alerts"></div>
+</main>
+
+<div class="overlay hidden" id="addOverlay">
+  <div class="modal">
+    <h3>Adicionar dispositivo</h3>
+    <div id="addForm">
+      <label>Nome (ex.: "Notebook — Renato")</label>
+      <input id="devName" placeholder="Notebook home office"/>
+      <label>Local (opcional)</label>
+      <input id="devLocation" placeholder="Casa — bairro/cidade"/>
+      <div class="actions">
+        <button class="btn" id="cancelAdd">Cancelar</button>
+        <button class="btn primary" id="confirmAdd">Criar</button>
+      </div>
+    </div>
+    <div id="addResult" class="hidden"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Guia de solução de problemas · Infraestrutura de TI baita</title>
+<link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+<header>
+  <div class="logo">🛰️</div>
+  <div>
+    <h1>Infraestrutura de TI</h1>
+    <div class="sub">Guia de solução de problemas</div>
+  </div>
+  <div class="hright">
+    <a class="navlink" href="/">← Painel</a>
+  </div>
+</header>
+
+<main class="guide">
+  <div class="thr">
+    <strong>Limiares usados para classificar a rede (voltados a videoconferência HD):</strong>
+    <table>
+      <tr><th>Métrica</th><th>OK</th><th>Atenção</th><th>Crítico</th></tr>
+      <tr><td>Latência</td><td>&lt; 100 ms</td><td>100–200 ms</td><td>&gt; 200 ms</td></tr>
+      <tr><td>Jitter</td><td>&lt; 30 ms</td><td>30–50 ms</td><td>&gt; 50 ms</td></tr>
+      <tr><td>Perda de pacotes</td><td>&lt; 1%</td><td>1–5%</td><td>&gt; 5%</td></tr>
+      <tr><td>Download</td><td>≥ 5 Mbps</td><td>2–5 Mbps</td><td>&lt; 2 Mbps</td></tr>
+      <tr><td>Upload</td><td>≥ 3 Mbps</td><td>1–3 Mbps</td><td>&lt; 1 Mbps</td></tr>
+      <tr><td>Resolução DNS</td><td>&lt; 150 ms</td><td>150–400 ms</td><td>&gt; 400 ms</td></tr>
+    </table>
+  </div>
+
+  <h2>Latência ou jitter alto (chamada "engasgando", áudio cortando)</h2>
+  <ul>
+    <li>Prefira <strong>cabo de rede (Ethernet)</strong> em vez de Wi-Fi durante a chamada — reduz jitter drasticamente.</li>
+    <li>Se precisar usar Wi-Fi, aproxime-se do roteador e evite paredes/lajes entre os dois.</li>
+    <li>Feche downloads, backups em nuvem, streaming (Netflix/YouTube) e atualizações de sistema durante a chamada — eles competem pela banda e aumentam o jitter.</li>
+    <li>Reinicie o roteador (desligue 30s, ligue novamente) — resolve travamentos acumulados de memória/CPU do equipamento.</li>
+    <li>Se o problema persiste com cabo e sem concorrência de banda, o gargalo provavelmente é do provedor de internet (ISP) — contate o suporte dele.</li>
+  </ul>
+
+  <h2>Perda de pacotes (voz picotada, congelamento de vídeo)</h2>
+  <ul>
+    <li>Verifique cabos e conectores de rede — mau contato costuma causar perda intermitente.</li>
+    <li>Wi-Fi: troque o canal do roteador (2.4GHz costuma ter mais interferência de vizinhos/eletrodomésticos; prefira 5GHz quando possível).</li>
+    <li>Muitos dispositivos conectados ao mesmo tempo (celulares, TVs, IoT) saturam o roteador — desconecte o que não estiver em uso durante reuniões importantes.</li>
+    <li>Se a perda for constante mesmo com poucos dispositivos, pode ser um problema físico no roteador/modem — considere reiniciá-lo ou trocar de equipamento.</li>
+  </ul>
+
+  <h2>Banda de download/upload baixa</h2>
+  <ul>
+    <li>Confirme o plano contratado com o provedor — pode não ser suficiente para vídeo em HD para múltiplas pessoas na mesma casa.</li>
+    <li>Upload costuma ser o gargalo em videoconferência (é o que sua câmera "envia"); planos residenciais geralmente têm upload bem menor que download — verifique se o plano tem upload dedicado ou é assimétrico demais.</li>
+    <li>Evite rodar backups/uploads grandes durante reuniões.</li>
+  </ul>
+
+  <h2>DNS lento (sites/serviços demoram a abrir, mas a chamada já em curso continua ok)</h2>
+  <ul>
+    <li>Considere configurar um DNS mais rápido no roteador, como 1.1.1.1 (Cloudflare) ou 8.8.8.8 (Google).</li>
+    <li>Não costuma afetar uma chamada já em andamento, mas pode atrasar a entrada/reconexão a reuniões.</li>
+  </ul>
+
+  <h2>Wi-Fi fraco</h2>
+  <ul>
+    <li>Sinal fraco (muito negativo em dBm, ou porcentagem baixa) indica distância/obstrução do roteador — aproxime-se ou use um repetidor/mesh.</li>
+    <li>Evite deixar o roteador dentro de armários, atrás da TV ou perto de micro-ondas/telefones sem fio.</li>
+  </ul>
+
+  <h2>Como o assistente identifica um problema</h2>
+  <p>O agente de monitoramento, instalado no computador de cada pessoa, roda testes periódicos (a cada poucos minutos): latência e perda de pacotes até servidores confiáveis da internet, tempo de resolução de DNS e um teste de velocidade de download/upload contra o próprio servidor do assistente. O painel classifica cada métrica como <strong>OK</strong>, <strong>Atenção</strong> ou <strong>Crítico</strong> usando os limiares acima, e abre um alerta automaticamente quando algo sai do normal — sem precisar de intervenção manual.</p>
+</main>
+</body>
+</html>

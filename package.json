@@ -19,20 +19,28 @@
     "connect": "tsx scripts/wa-connect.ts",
     "personal": "WA_ADAPTER=playwright tsx src/index.ts",
     "agent": "WA_ADAPTER=playwright tsx scripts/wa-agent.ts",
-    "mcp:smoke": "node scripts/mcp-smoke.mjs"
+    "mcp:smoke": "node scripts/mcp-smoke.mjs",
+    "it-assistant": "tsx src/it-assistant/server.ts",
+    "it-assistant:agent": "tsx src/it-assistant/agent/monitor.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "better-sqlite3": "^9.4.3",
+    "cookie-parser": "^1.4.6",
     "express": "^4.18.3",
+    "google-auth-library": "^9.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.0.7",
     "playwright": "^1.44.0",
     "qrcode": "^1.5.4",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
+    "@types/cookie-parser": "^1.4.7",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.11.0",
     "@types/qrcode": "^1.5.6",
     "tsx": "^4.7.0",

@@ -129,3 +129,42 @@ npm test          # vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 ```
+
+---
+
+## Assistente de Infraestrutura de TI (baita)
+
+Painel web para o time da **baita** monitorar a saúde da própria rede
+doméstica (home office), com foco em qualidade de **videoconferência**:
+latência, jitter, perda de pacotes, DNS, velocidade de download/upload e
+sinal de Wi-Fi — com detecção automática de falhas, alertas e um guia de
+solução de problemas. Login via **Google restrito ao domínio `@baita.ac`**.
+
+```bash
+cp .env.example .env
+# defina GOOGLE_CLIENT_ID, SESSION_SECRET, IT_ASSISTANT_ADMINS (ver .env.example)
+npm run it-assistant          # sobe o painel em http://localhost:4200
+```
+
+Cada pessoa do time gera um token de dispositivo no painel e roda o agente de
+monitoramento no próprio computador (via cron/launchd/Agendador de Tarefas):
+
+```bash
+IT_ASSISTANT_SERVER_URL=https://it.baita.ac IT_ASSISTANT_DEVICE_TOKEN=ita_xxx \
+  npm run it-assistant:agent
+```
+
+Detalhes de arquitetura, limiares de qualidade e instalação do agente por
+sistema operacional: `src/it-assistant/agent/README.md` e a página **Guia de
+solução de problemas** dentro do próprio painel (`/guia`).
+
+```
+src/it-assistant/
+├── server.ts            # painel web (Express) + páginas protegidas por sessão
+├── auth.ts               # login Google (restrito a @baita.ac) + tokens de dispositivo
+├── db.ts                  # SQLite: users, devices, reports, alerts
+├── thresholds.ts           # classificação OK/Atenção/Crítico p/ videoconferência
+├── routes/                  # /auth, /api (devices, report, status, history, alerts)
+└── agent/                    # script que roda no PC de cada pessoa (ping/DNS/speedtest/Wi-Fi)
+public/it-assistant/       # dashboard, login e guia (HTML/CSS/JS estáticos)
+```

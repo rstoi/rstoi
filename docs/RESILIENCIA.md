@@ -40,9 +40,10 @@ commitados. Devem ser providos pela plataforma ou refeitos:
 | Item | Onde configurar / como restaurar |
 |---|---|
 | **Segredos** (`.env`: tokens Meta, API keys, etc.) | Variáveis de ambiente do **environment** do Claude Code na web (não no repo). Use `.env.example` como referência. |
+| **Segredos do Assistente de TI** (`GOOGLE_CLIENT_ID`, `SESSION_SECRET`, tokens de dispositivo) | Idem — variáveis de ambiente do environment. Tokens de dispositivo (`ita_...`) são gerados pelo painel e guardados apenas como hash no SQLite; se perdidos, gere um novo em "Gerar novo token". |
 | **Política de rede (egress)** | Configuração do environment. Hoje libera essencialmente `github.com` + registries (npm/PyPI). Para acessar outros hosts (ex.: `setup.com.br`), inclua-os na allowlist. |
 | **Login do WhatsApp** (`data/wa-session`, QR) | Re-autenticação interativa: `npm run connect` e escanear o QR (WhatsApp → Aparelhos conectados). Auth interativa não é persistível com segurança no repo. |
-| **Banco SQLite** (`data/*.db`) | Recriado pelos agentes na primeira execução. Histórico não persiste entre reboots a menos que armazenado externamente. |
+| **Banco SQLite** (`data/*.db`, incluindo `data/it-assistant.db`) | Recriado pelos agentes na primeira execução. Histórico não persiste entre reboots a menos que armazenado externamente. |
 
 ## Guardrail de chats/grupos bloqueados
 
