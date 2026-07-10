@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#0F1B2D</color>
+    <color name="selected_background">#1F3B5C</color>
+    <color name="placeholder">#243447</color>
+</resources>

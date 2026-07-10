@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema Leanback (necessario para BrowseSupportFragment). -->
+    <style name="Theme.FireTvApp" parent="Theme.Leanback">
+        <item name="android:colorPrimary">@color/brand</item>
+    </style>
+</resources>
