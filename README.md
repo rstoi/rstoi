@@ -129,3 +129,16 @@ npm test          # vitest
 npm run typecheck # tsc --noEmit
 npm run build     # compile to dist/
 ```
+
+## Shared AI Harness
+
+Beyond the MCP server, this repo carries a **shared AI harness** for the
+setup.com.br team — one place where every agent (Claude Code, WhatsApp, Google
+Workspace, GitHub) finds the same company context, rules and reusable workflows.
+It follows the progression *memory → context → policy → worker → review → team
+default*.
+
+- Start here: [`harness/README.md`](harness/README.md)
+- The map (routing): [`harness/CHARTER.md`](harness/CHARTER.md)
+- First proven workflow — weekly intelligence brief. Run it in Claude Code with
+  `/weekly-intelligence` (see `.claude/commands/weekly-intelligence.md`).
